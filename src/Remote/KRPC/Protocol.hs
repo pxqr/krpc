@@ -25,9 +25,12 @@ module Remote.KRPC.Protocol
 
          -- * Query
        , KQuery(queryMethod, queryParams), MethodName, ParamName, kquery
+       , KQueryScheme(qscMethod, qscParams)
 
          -- * Response
-       , KResponse(..), ValName, kresponse
+       , KResponse(respVals), ValName, kresponse
+       , KResponseScheme(rscVals)
+
        , sendMessage, recvResponse
 
          -- * Remote
@@ -37,6 +40,7 @@ module Remote.KRPC.Protocol
        , encode, encoded, decode, decoded, toBEncode, fromBEncode
        ) where
 
+import Prelude hiding (catch)
 import Control.Applicative
 import Control.Exception.Lifted
 import Control.Monad
@@ -71,10 +75,16 @@ class KMessage message scheme | message -> scheme where
 
 -- TODO document that it is and how transferred
 data KError
+    -- | Some error doesn't fit in any other category.
   = GenericError { errorMessage :: Text }
+
+    -- | Occur when server fail to process procedure call.
   | ServerError  { errorMessage :: Text }
+
     -- | Malformed packet, invalid arguments or bad token.
   | ProtocolError { errorMessage :: Text }
+
+    -- | Occur when client trying to call method server don't know.
   | MethodUnknown { errorMessage :: Text }
    deriving (Show, Read, Eq, Ord)
 
@@ -112,7 +122,8 @@ mkKError 204 = MethodUnknown
 mkKError _   = GenericError
 {-# INLINE mkKError #-}
 
-
+serverError :: SomeException -> KError
+serverError = ServerError . T.pack . show
 
 -- TODO Asc everywhere
 
@@ -211,7 +222,11 @@ maxMsgSize = 16 * 1024
 sendMessage :: BEncodable msg => msg -> KRemoteAddr -> KRemote -> IO ()
 sendMessage msg (host, port) sock =
   sendAllTo sock (LB.toStrict (encoded msg)) (SockAddrInet port host)
+{-# INLINE sendMessage #-}
+{-# SPECIALIZE sendMessage :: BEncode -> KRemoteAddr -> KRemote -> IO ()  #-}
 
+
+-- TODO check scheme
 recvResponse :: KRemoteAddr -> KRemote -> IO (Either KError KResponse)
 recvResponse addr sock = do
   connect sock (remoteAddr addr)
@@ -221,6 +236,7 @@ recvResponse addr sock = do
     Left decE -> Left $ case decoded raw of
       Right kerror -> kerror
       _ -> ProtocolError (T.pack decE)
+
 
 remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
              => PortNumber
@@ -235,24 +251,23 @@ remoteServer servport action = bracket (liftIO bind) (liftIO . sClose) loop
 
     loop sock = forever $ do
       (bs, addr) <- liftIO $ recvFrom sock maxMsgSize
-
       case addr of
-        SockAddrInet port host ->
-          case decoded bs of
-            Right query -> do
-              res <- action (host, port) query
-              case res of
-                Right resp -> liftIO $ sendMessage resp (host, port) sock
-                Left err   -> liftIO $ sendMessage err  (host, port) sock
-
-            Left decodeE -> liftIO $ sendMessage rpcE (host, port) sock
-              where
-                rpcE = ProtocolError $ T.concat
-                  ["Unable to decode query: ", T.pack (show bs), "\n"
-                  ,"Specifically: ", T.pack decodeE
-                  ]
+        SockAddrInet port host -> do
+           let kaddr = (host, port)
+           reply <- handleMsg bs kaddr
+           liftIO $ sendMessage reply kaddr sock
         _ -> return ()
 
+      where
+        handleMsg bs addr = case decoded bs of
+          Right query -> (either toBEncode toBEncode <$> action addr query)
+                        `catch` (return . toBEncode . serverError)
+          Left decodeE   -> return $ toBEncode rpcE
+            where
+              rpcE = ProtocolError $ T.concat
+                ["Unable to decode query: ", T.pack (show bs), "\n"
+                ,"Specifically: ", T.pack decodeE
+                ]
 
 
 -- TODO to bencodable
