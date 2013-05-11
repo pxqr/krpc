@@ -11,14 +11,20 @@
 --
 --   > See http://www.bittorrent.org/beps/bep_0005.html#krpc-protocol
 --
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE FlexibleContexts, TypeSynonymInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE DefaultSignatures #-}
 module Remote.KRPC.Protocol
        (
+         -- * Message
+         KMessage(..)
+
          -- * Error
-         KError(..), errorCode, mkKError
+       , KError(..), errorCode, mkKError
 
          -- * Query
-       , KQuery(..), MethodName, ParamName, kquery
+       , KQuery(queryMethod, queryParams), MethodName, ParamName, kquery
 
          -- * Response
        , KResponse(..), ValName, kresponse
@@ -40,11 +46,30 @@ import Data.BEncode
 import Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Map as M
+import Data.Set as S
 import Data.Text as T
 import Network.Socket hiding (recvFrom)
 import Network.Socket.ByteString
 
 
+
+-- | Used to validate message by its scheme
+--
+--  forall m. m `validate` scheme m
+--
+class KMessage message scheme | message -> scheme where
+  -- | Get a message scheme.
+  scheme :: message -> scheme
+
+  -- | Check a message with a scheme.
+  validate :: message -> scheme -> Bool
+
+  default validate :: Eq scheme => message -> scheme -> Bool
+  validate = (==) . scheme
+  {-# INLINE validate #-}
+
+
+-- TODO document that it is and how transferred
 data KError
   = GenericError { errorMessage :: Text }
   | ServerError  { errorMessage :: Text }
@@ -65,6 +90,11 @@ instance BEncodable KError where
 
   fromBEncode _ = decodingError "KError"
 
+instance KMessage KError ErrorCode where
+  {-# SPECIALIZE instance KMessage KError ErrorCode #-}
+  scheme = errorCode
+  {-# INLINE scheme #-}
+
 type ErrorCode = Int
 
 errorCode :: KError -> ErrorCode
@@ -72,6 +102,7 @@ errorCode (GenericError _)  = 201
 errorCode (ServerError _)   = 202
 errorCode (ProtocolError _) = 203
 errorCode (MethodUnknown _) = 204
+{-# INLINE errorCode #-}
 
 mkKError :: ErrorCode -> Text -> KError
 mkKError 201 = GenericError
@@ -79,15 +110,20 @@ mkKError 202 = ServerError
 mkKError 203 = ProtocolError
 mkKError 204 = MethodUnknown
 mkKError _   = GenericError
+{-# INLINE mkKError #-}
 
+
+
+-- TODO Asc everywhere
 
 
 type MethodName = ByteString
 type ParamName  = ByteString
 
+-- TODO document that it is and how transferred
 data KQuery = KQuery {
     queryMethod :: MethodName
-  , queryArgs   :: Map ParamName BEncode
+  , queryParams :: Map ParamName BEncode
   } deriving (Show, Read, Eq, Ord)
 
 instance BEncodable KQuery where
@@ -106,14 +142,27 @@ instance BEncodable KQuery where
 
 kquery :: MethodName -> [(ParamName, BEncode)] -> KQuery
 kquery name args = KQuery name (M.fromList args)
+{-# INLINE kquery #-}
 
+data KQueryScheme = KQueryScheme {
+    qscMethod :: MethodName
+  , qscParams :: Set ParamName
+  } deriving (Show, Read, Eq, Ord)
 
+domen :: Map a b -> Set a
+domen = error "scheme.domen"
 
+instance KMessage KQuery KQueryScheme where
+  {-# SPECIALIZE instance KMessage KQuery KQueryScheme #-}
+  scheme q = KQueryScheme (queryMethod q) (domen (queryParams q))
+  {-# INLINE scheme #-}
 
 type ValName = ByteString
 
-newtype KResponse = KResponse (Map ValName BEncode)
-                    deriving (Show, Read, Eq, Ord)
+-- TODO document that it is and how transferred
+newtype KResponse = KResponse {
+    respVals :: Map ValName BEncode
+  } deriving (Show, Read, Eq, Ord)
 
 instance BEncodable KResponse where
   toBEncode (KResponse vals) = fromAssocs
@@ -121,21 +170,33 @@ instance BEncodable KResponse where
     , "r" --> vals
     ]
 
-
   fromBEncode (BDict d)
     | M.lookup "y" d == Just (BString "r") =
       KResponse <$> d >-- "r"
 
   fromBEncode _ = decodingError "KDict"
 
+
 kresponse :: [(ValName, BEncode)] -> KResponse
 kresponse = KResponse . M.fromList
+{-# INLINE kresponse #-}
+
+newtype KResponseScheme = KResponseScheme {
+    rscVals :: Set ValName
+  } deriving (Show, Read, Eq, Ord)
+
+instance KMessage KResponse KResponseScheme where
+  {-# SPECIALIZE instance KMessage KResponse KResponseScheme #-}
+  scheme = KResponseScheme . domen . respVals
+  {-# INLINE scheme #-}
 
 
 type KRemoteAddr = (HostAddress, PortNumber)
 
 remoteAddr :: KRemoteAddr -> SockAddr
 remoteAddr = SockAddrInet <$> snd <*> fst
+{-# INLINE remoteAddr #-}
+
 
 type KRemote = Socket
 
