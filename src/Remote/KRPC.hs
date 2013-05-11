@@ -17,7 +17,7 @@ module Remote.KRPC
        , call, async, await
 
          -- * Server
-       , handler, server
+       , server
        ) where
 
 import Control.Exception
@@ -46,14 +46,14 @@ type RemoteAddr = KRemoteAddr
 
 queryCall :: BEncodable param
           => KRemote -> KRemoteAddr
-          -> Method remote param result -> param -> IO ()
+          -> Method param result -> param -> IO ()
 queryCall sock addr m arg = sendMessage q addr sock
   where
     q = kquery (L.head (methodName m)) [(L.head (methodParams m), toBEncode arg)]
 
 getResult :: BEncodable result
           => KRemote -> KRemoteAddr
-          -> Method remote param result -> IO result
+          -> Method param result -> IO result
 getResult sock addr m = do
   resp <- recvResponse addr sock
   case resp of
@@ -76,7 +76,7 @@ getResult sock addr m = do
 call :: (MonadBaseControl IO host, MonadIO host)
      => (BEncodable param, BEncodable result)
      => RemoteAddr
-     -> Method remote param result
+     -> Method param result
      -> param
      -> host result
 call addr m arg = liftIO $ withRemote $ \sock -> do
@@ -86,10 +86,11 @@ call addr m arg = liftIO $ withRemote $ \sock -> do
 
 newtype Async result = Async { waitResult :: IO result }
 
+-- TODO document errorneous usage
 async :: MonadIO host
       => (BEncodable param, BEncodable result)
       => RemoteAddr
-      -> Method remote param result
+      -> Method param result
       -> param
       -> host (Async result)
 async addr m arg = do
@@ -102,31 +103,37 @@ await :: MonadIO host => Async result -> host result
 await = liftIO . waitResult
 
 -- TODO better name
-type MHandler remote = Method remote BEncode (Result BEncode)
+type MHandler remote = ( Method BEncode (Result BEncode)
+                       , BEncode -> remote (Result BEncode)
+                       )
 
-handler :: forall (remote :: * -> *) (param :: *) (result :: *).
+-- we can safely erase types in (==>)
+(==>) :: forall (remote :: * -> *) (param :: *) (result :: *).
            (BEncodable param, BEncodable result)
         => Monad remote
-        => Method remote param result
-        -> Method remote BEncode (Result BEncode)
-handler m = m { methodBody = \x -> do
-                  case fromBEncode x of
-                    Right a -> liftM (Right . toBEncode) (methodBody m a)
+        => Method param result
+        -> (param -> remote result)
+        -> MHandler remote
+m ==> body = undefined
+  where
+    newbody x = case fromBEncode x of
+                    Right a -> liftM (Right . toBEncode) (body a)
                     Left e  -> return (Left e)
-              }
+
 
 -- TODO: allow forkIO
+-- TODO: allow overloading
 server :: (MonadBaseControl IO remote, MonadIO remote)
        => PortNumber
        -> [MHandler remote]
        -> remote ()
 server servport ms = remoteServer servport $ \_ q -> do
   let name = queryMethod q
-  let args = queryArgs q
+  let args = undefined -- queryArgs q
   let m = L.head ms
-  res <- methodBody m (snd (L.head (M.toList args)))
+  res <- undefined -- methodBody m (snd (L.head (M.toList args)))
   case res of
    Left  r -> return (Left (ProtocolError (T.pack r)))
    Right r -> do
-     let retName = L.head (methodVals m)
+     let retName = undefined -- L.head (methodVals m)
      return (Right (kresponse [(retName, r)]))
