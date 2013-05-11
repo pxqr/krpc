@@ -6,4 +6,4 @@ import Shared
 
 
 main :: IO ()
-main = server 6000 [undefined]
+main = server 6000 [echoInt ==> return]

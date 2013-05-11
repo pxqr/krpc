@@ -1,6 +1,14 @@
+-- |
+--   Copyright   :  (c) Sam T. 2013
+--   License     :  MIT
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
 {-# LANGUAGE OverloadedStrings #-}
 module Remote.KRPC.Method
        ( Method(methodName, methodParams, methodVals)
+       , methodQueryScheme, methodRespScheme
 
          -- * Construction
        , method
@@ -10,11 +18,14 @@ module Remote.KRPC.Method
        ) where
 
 import Prelude hiding ((.), id)
+import Control.Applicative
 import Control.Category
 import Control.Monad
+import Data.ByteString as B
+import Data.List as L
+import Data.Set as S
 
 import Remote.KRPC.Protocol
-
 
 
 -- | The
@@ -44,6 +55,15 @@ instance Category Method where
   (.) = composeM
   {-# INLINE (.) #-}
 
+methodQueryScheme :: Method a b -> KQueryScheme
+methodQueryScheme = KQueryScheme <$> B.intercalate "." . methodName
+                                 <*> S.fromList . methodParams
+{-# INLINE methodQueryScheme #-}
+
+
+methodRespScheme :: Method a b -> KResponseScheme
+methodRespScheme = KResponseScheme . S.fromList . methodVals
+{-# INLINE methodRespScheme #-}
 
 -- TODO ppMethod
 

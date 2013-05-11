@@ -24,12 +24,12 @@ module Remote.KRPC.Protocol
        , KError(..), errorCode, mkKError
 
          -- * Query
-       , KQuery(queryMethod, queryParams), MethodName, ParamName, kquery
-       , KQueryScheme(qscMethod, qscParams)
+       , KQuery(queryMethod, queryArgs), MethodName, ParamName, kquery
+       , KQueryScheme(KQueryScheme, qscMethod, qscParams)
 
          -- * Response
        , KResponse(respVals), ValName, kresponse
-       , KResponseScheme(rscVals)
+       , KResponseScheme(KResponseScheme, rscVals)
 
        , sendMessage, recvResponse
 
@@ -46,12 +46,14 @@ import Control.Exception.Lifted
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
+
 import Data.BEncode
 import Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Map as M
 import Data.Set as S
 import Data.Text as T
+
 import Network.Socket hiding (recvFrom)
 import Network.Socket.ByteString
 
@@ -134,7 +136,7 @@ type ParamName  = ByteString
 -- TODO document that it is and how transferred
 data KQuery = KQuery {
     queryMethod :: MethodName
-  , queryParams :: Map ParamName BEncode
+  , queryArgs   :: Map ParamName BEncode
   } deriving (Show, Read, Eq, Ord)
 
 instance BEncodable KQuery where
@@ -160,12 +162,9 @@ data KQueryScheme = KQueryScheme {
   , qscParams :: Set ParamName
   } deriving (Show, Read, Eq, Ord)
 
-domen :: Map a b -> Set a
-domen = error "scheme.domen"
-
 instance KMessage KQuery KQueryScheme where
   {-# SPECIALIZE instance KMessage KQuery KQueryScheme #-}
-  scheme q = KQueryScheme (queryMethod q) (domen (queryParams q))
+  scheme q = KQueryScheme (queryMethod q) (M.keysSet (queryArgs q))
   {-# INLINE scheme #-}
 
 type ValName = ByteString
@@ -198,7 +197,7 @@ newtype KResponseScheme = KResponseScheme {
 
 instance KMessage KResponse KResponseScheme where
   {-# SPECIALIZE instance KMessage KResponse KResponseScheme #-}
-  scheme = KResponseScheme . domen . respVals
+  scheme = KResponseScheme . keysSet . respVals
   {-# INLINE scheme #-}
 
 

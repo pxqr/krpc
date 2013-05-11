@@ -10,6 +10,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts, DeriveDataTypeable #-}
 {-# LANGUAGE ExplicitForAll, KindSignatures #-}
+{-# LANGUAGE ViewPatterns #-}
 module Remote.KRPC
        ( module Remote.KRPC.Method, RemoteAddr
 
@@ -17,7 +18,7 @@ module Remote.KRPC
        , call, async, await
 
          -- * Server
-       , server
+       , (==>), server
        ) where
 
 import Control.Exception
@@ -27,6 +28,7 @@ import Control.Monad.IO.Class
 import Data.BEncode
 import Data.List as L
 import Data.Map  as M
+import Data.Set  as S
 import Data.Text as T
 import Data.Typeable
 import Network
@@ -51,6 +53,7 @@ queryCall sock addr m arg = sendMessage q addr sock
   where
     q = kquery (L.head (methodName m)) [(L.head (methodParams m), toBEncode arg)]
 
+-- TODO check scheme
 getResult :: BEncodable result
           => KRemote -> KRemoteAddr
           -> Method param result -> IO result
@@ -58,7 +61,7 @@ getResult sock addr m = do
   resp <- recvResponse addr sock
   case resp of
     Left e -> throw (RPCException e)
-    Right (KResponse dict) -> do
+    Right (respVals -> dict) -> do
       let valName = L.head (methodVals m)
       case M.lookup valName dict of
         Just val | Right res <- fromBEncode val -> return res
@@ -102,10 +105,10 @@ async addr m arg = do
 await :: MonadIO host => Async result -> host result
 await = liftIO . waitResult
 
--- TODO better name
-type MHandler remote = ( Method BEncode (Result BEncode)
-                       , BEncode -> remote (Result BEncode)
-                       )
+type HandlerBody remote = (BEncode -> remote (Result BEncode), KResponseScheme)
+
+type MethodHandler remote = (KQueryScheme, HandlerBody remote)
+
 
 -- we can safely erase types in (==>)
 (==>) :: forall (remote :: * -> *) (param :: *) (result :: *).
@@ -113,8 +116,8 @@ type MHandler remote = ( Method BEncode (Result BEncode)
         => Monad remote
         => Method param result
         -> (param -> remote result)
-        -> MHandler remote
-m ==> body = undefined
+        -> MethodHandler remote
+m ==> body = (methodQueryScheme m, (newbody, methodRespScheme m))
   where
     newbody x = case fromBEncode x of
                     Right a -> liftM (Right . toBEncode) (body a)
@@ -125,15 +128,28 @@ m ==> body = undefined
 -- TODO: allow overloading
 server :: (MonadBaseControl IO remote, MonadIO remote)
        => PortNumber
-       -> [MHandler remote]
+       -> [MethodHandler remote]
        -> remote ()
-server servport ms = remoteServer servport $ \_ q -> do
-  let name = queryMethod q
-  let args = undefined -- queryArgs q
-  let m = L.head ms
-  res <- undefined -- methodBody m (snd (L.head (M.toList args)))
-  case res of
-   Left  r -> return (Left (ProtocolError (T.pack r)))
-   Right r -> do
-     let retName = undefined -- L.head (methodVals m)
-     return (Right (kresponse [(retName, r)]))
+server servport handlers = do
+    remoteServer servport $ \_ q -> do
+      case dispatch (scheme q) of
+        Nothing -> return (Left (MethodUnknown "method"))
+        Just (m, rsc) -> do
+          let arg = snd (L.head (M.toList (queryArgs q)))
+
+          res <- invoke m arg
+          let valName = L.head (S.toList (rscVals rsc))
+          return $ bimap (ProtocolError . T.pack)
+                         (kresponse . return .  (,) valName) res
+  where
+    handlerMap = M.fromList handlers
+
+--    dispatch :: KQueryScheme -> MethodHandler remote
+    dispatch s | Just m <-  M.lookup s handlerMap = return m
+               | otherwise                        = Nothing
+
+--    invoke :: MethodHandler remote -> BEncode -> remote BEncode
+    invoke m args = m args
+
+    bimap f _ (Left  x) = Left (f x)
+    bimap _ g (Right x) = Right (g x)
