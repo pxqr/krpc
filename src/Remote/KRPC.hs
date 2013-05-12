@@ -30,8 +30,6 @@ import Data.ByteString.Char8 as BC
 import Data.List as L
 import Data.Map  as M
 import Data.Set  as S
-import Data.Text as T
-import Data.Text.Encoding as T
 import Data.Typeable
 import Network
 
@@ -77,7 +75,7 @@ getResult sock addr m = do
     Right (respVals -> dict) -> do
       case extractArgs (methodVals m) dict >>= extractor of
         Right vals -> return vals
-        Left  e    -> throw (RPCException (ProtocolError (T.pack e)))
+        Left  e    -> throw (RPCException (ProtocolError (BC.pack e)))
 
 -- TODO async call
 -- | Makes remote procedure call. Throws RPCException if server
@@ -135,7 +133,7 @@ m ==> body = (methodName m, newbody)
     {-# INLINE newbody #-}
     newbody q =
       case extractArgs (methodParams m) (queryArgs q) >>= extractor of
-        Left  e -> return (Left (ProtocolError (T.pack e)))
+        Left  e -> return (Left (ProtocolError (BC.pack e)))
         Right a -> do
           r <- body a
           return (Right (kresponse (mkVals (methodVals m) (injector r))))
@@ -151,7 +149,7 @@ server :: (MonadBaseControl IO remote, MonadIO remote)
 server servport handlers = do
     remoteServer servport $ \_ q -> do
       case dispatch (queryMethod q) of
-        Nothing -> return $ Left $ MethodUnknown (decodeUtf8 (queryMethod q))
+        Nothing -> return $ Left $ MethodUnknown (queryMethod q)
         Just  m -> invoke m q
   where
     handlerMap = M.fromList handlers

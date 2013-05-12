@@ -49,10 +49,10 @@ import Control.Monad.Trans.Control
 
 import Data.BEncode
 import Data.ByteString as B
+import Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as LB
 import Data.Map as M
 import Data.Set as S
-import Data.Text as T
 
 import Network.Socket hiding (recvFrom)
 import Network.Socket.ByteString
@@ -78,16 +78,16 @@ class KMessage message scheme | message -> scheme where
 -- TODO document that it is and how transferred
 data KError
     -- | Some error doesn't fit in any other category.
-  = GenericError { errorMessage :: Text }
+  = GenericError { errorMessage :: ByteString }
 
     -- | Occur when server fail to process procedure call.
-  | ServerError  { errorMessage :: Text }
+  | ServerError  { errorMessage :: ByteString }
 
     -- | Malformed packet, invalid arguments or bad token.
-  | ProtocolError { errorMessage :: Text }
+  | ProtocolError { errorMessage :: ByteString }
 
     -- | Occur when client trying to call method server don't know.
-  | MethodUnknown { errorMessage :: Text }
+  | MethodUnknown { errorMessage :: ByteString }
    deriving (Show, Read, Eq, Ord)
 
 instance BEncodable KError where
@@ -116,7 +116,7 @@ errorCode (ProtocolError _) = 203
 errorCode (MethodUnknown _) = 204
 {-# INLINE errorCode #-}
 
-mkKError :: ErrorCode -> Text -> KError
+mkKError :: ErrorCode -> ByteString -> KError
 mkKError 201 = GenericError
 mkKError 202 = ServerError
 mkKError 203 = ProtocolError
@@ -125,7 +125,7 @@ mkKError _   = GenericError
 {-# INLINE mkKError #-}
 
 serverError :: SomeException -> KError
-serverError = ServerError . T.pack . show
+serverError = ServerError . BC.pack . show
 
 -- TODO Asc everywhere
 
@@ -238,7 +238,7 @@ recvResponse addr sock = do
     Right resp -> Right resp
     Left decE -> Left $ case decoded raw of
       Right kerror -> kerror
-      _ -> ProtocolError (T.pack decE)
+      _ -> ProtocolError (BC.pack decE)
 
 
 remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
@@ -265,12 +265,7 @@ remoteServer servport action = bracket (liftIO bind) (liftIO . sClose) loop
         handleMsg bs addr = case decoded bs of
           Right query -> (either toBEncode toBEncode <$> action addr query)
                         `catch` (return . toBEncode . serverError)
-          Left decodeE   -> return $ toBEncode rpcE
-            where
-              rpcE = ProtocolError $ T.concat
-                ["Unable to decode query: ", T.pack (show bs), "\n"
-                ,"Specifically: ", T.pack decodeE
-                ]
+          Left decodeE   -> return $ toBEncode (ProtocolError (BC.pack decodeE))
 
 
 -- TODO to bencodable
