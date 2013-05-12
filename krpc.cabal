@@ -22,7 +22,6 @@ source-repository head
 library
   exposed-modules:     Remote.KRPC
                      , Remote.KRPC.Protocol
-                     , Remote.KRPC.Method
 
   build-depends:       base          == 4.*
 

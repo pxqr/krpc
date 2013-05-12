@@ -5,14 +5,20 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   This module provides remote procedure call.
+--   This module provides safe remote procedure call.
 --
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts, DeriveDataTypeable #-}
 {-# LANGUAGE ExplicitForAll, KindSignatures #-}
 {-# LANGUAGE ViewPatterns #-}
 module Remote.KRPC
-       ( module Remote.KRPC.Method, RemoteAddr
+       ( -- * Common
+         -- ** Types
+         RemoteAddr
+
+         -- ** Method
+       , Method(methodName, methodParams, methodVals)
+       , method, idM
 
          -- * Client
        , call, async, await
@@ -33,7 +39,40 @@ import Data.Typeable
 import Network
 
 import Remote.KRPC.Protocol
-import Remote.KRPC.Method
+
+
+-- | The
+--
+--   * argument: type of method parameter
+--
+--   * remote: A monad used by server-side.
+--
+--   * result: type of return value of the method.
+--
+data Method param result = Method {
+    -- | Name used in query and
+    methodName   :: MethodName
+
+    -- | Description of each parameter in /right to left/ order.
+  , methodParams :: [ParamName]
+
+    -- | Description of each return value in /right to left/ order.
+  , methodVals   :: [ValName]
+  }
+
+-- TODO ppMethod
+
+-- | Remote identity function. Could be used for echo servers for example.
+--
+--   idM = method "id" ["x"] ["y"] return
+--
+idM :: Method a a
+idM = method "id" ["x"] ["y"]
+{-# INLINE idM #-}
+
+method :: MethodName -> [ParamName] -> [ValName] -> Method param result
+method = Method
+{-# INLINE method #-}
 
 
 data RPCException = RPCException KError
