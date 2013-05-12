@@ -13,6 +13,11 @@ bug-reports:           https://github.com/pxqr/krpc/issues
 synopsis:              KRPC remote procedure call protocol implementation.
 description:           KRPC remote procedure call protocol implementation.
 
+source-repository head
+  type:                git
+  location:            https://github.com/pxqr/krpc.git
+
+
 
 library
   exposed-modules:     Remote.KRPC
@@ -38,22 +43,31 @@ library
 
 
 
-executable echo-client
+
+executable exsample-client
   main-is:             Client.hs
   other-modules:       Shared
-
-  build-depends:       base        == 4.*
-                     , krpc
-
+  build-depends:       base        == 4.*, krpc
   hs-source-dirs:      examples
 
-
-
-executable echo-server
+executable exsample-server
   main-is:             Server.hs
   other-modules:       Shared
-
-  build-depends:       base        == 4.*
-                     , krpc
-
+  build-depends:       base        == 4.*, krpc
   hs-source-dirs:      examples
+
+
+
+
+executable bench-server
+  main-is:             Server.hs
+  build-depends:       base        == 4.*, krpc
+  hs-source-dirs:      bench
+  ghc-options:         -O2
+
+benchmark bench-client
+  type:                exitcode-stdio-1.0
+  main-is:             Main.hs
+  hs-source-dirs:      bench
+  build-depends:       base == 4.5.*, krpc, criterion
+  ghc-options:         -O2
