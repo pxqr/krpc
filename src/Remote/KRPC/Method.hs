@@ -9,7 +9,6 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
 module Remote.KRPC.Method
        ( Method(methodName, methodParams, methodVals)
-       , methodQueryScheme, methodRespScheme
 
          -- * Construction
        , method
@@ -17,10 +16,6 @@ module Remote.KRPC.Method
          -- * Predefined methods
        , idM
        ) where
-
-import Control.Applicative
-import Data.BEncode
-import Data.Set as S
 
 import Remote.KRPC.Protocol
 
@@ -43,15 +38,6 @@ data Method param result = Method {
     -- | Description of each return value in /right to left/ order.
   , methodVals   :: [ValName]
   }
-methodQueryScheme :: Method a b -> KQueryScheme
-methodQueryScheme = KQueryScheme <$> methodName
-                                 <*> S.fromList . methodParams
-{-# INLINE methodQueryScheme #-}
-
-
-methodRespScheme :: Method a b -> KResponseScheme
-methodRespScheme = KResponseScheme . S.fromList . methodVals
-{-# INLINE methodRespScheme #-}
 
 -- TODO ppMethod
 

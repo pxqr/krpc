@@ -17,19 +17,15 @@
 {-# LANGUAGE DefaultSignatures #-}
 module Remote.KRPC.Protocol
        (
-         -- * Message
-         KMessage(..)
 
          -- * Error
-       , KError(..), errorCode, mkKError
+         KError(..), errorCode, mkKError
 
          -- * Query
        , KQuery(queryMethod, queryArgs), MethodName, ParamName, kquery
-       , KQueryScheme(KQueryScheme, qscMethod, qscParams)
 
          -- * Response
        , KResponse(respVals), ValName, kresponse
-       , KResponseScheme(KResponseScheme, rscVals)
 
        , sendMessage, recvResponse
 
@@ -52,27 +48,10 @@ import Data.ByteString as B
 import Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as LB
 import Data.Map as M
-import Data.Set as S
 
 import Network.Socket hiding (recvFrom)
 import Network.Socket.ByteString
 
-
-
--- | Used to validate message by its scheme
---
---  forall m. m `validate` scheme m
---
-class KMessage message scheme | message -> scheme where
-  -- | Get a message scheme.
-  scheme :: message -> scheme
-
-  -- | Check a message with a scheme.
-  validate :: message -> scheme -> Bool
-
-  default validate :: Eq scheme => message -> scheme -> Bool
-  validate = (==) . scheme
-  {-# INLINE validate #-}
 
 -- TODO Text -> ByteString
 -- TODO document that it is and how transferred
@@ -101,11 +80,6 @@ instance BEncodable KError where
     = uncurry mkKError <$> d >-- "e"
 
   fromBEncode _ = decodingError "KError"
-
-instance KMessage KError ErrorCode where
-  {-# SPECIALIZE instance KMessage KError ErrorCode #-}
-  scheme = errorCode
-  {-# INLINE scheme #-}
 
 type ErrorCode = Int
 
@@ -157,15 +131,8 @@ kquery :: MethodName -> [(ParamName, BEncode)] -> KQuery
 kquery name args = KQuery name (M.fromList args)
 {-# INLINE kquery #-}
 
-data KQueryScheme = KQueryScheme {
-    qscMethod :: MethodName
-  , qscParams :: Set ParamName
-  } deriving (Show, Read, Eq, Ord)
 
-instance KMessage KQuery KQueryScheme where
-  {-# SPECIALIZE instance KMessage KQuery KQueryScheme #-}
-  scheme q = KQueryScheme (queryMethod q) (M.keysSet (queryArgs q))
-  {-# INLINE scheme #-}
+
 
 type ValName = ByteString
 
@@ -191,14 +158,6 @@ kresponse :: [(ValName, BEncode)] -> KResponse
 kresponse = KResponse . M.fromList
 {-# INLINE kresponse #-}
 
-newtype KResponseScheme = KResponseScheme {
-    rscVals :: Set ValName
-  } deriving (Show, Read, Eq, Ord)
-
-instance KMessage KResponse KResponseScheme where
-  {-# SPECIALIZE instance KMessage KResponse KResponseScheme #-}
-  scheme = KResponseScheme . keysSet . respVals
-  {-# INLINE scheme #-}
 
 
 type KRemoteAddr = (HostAddress, PortNumber)
