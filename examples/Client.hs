@@ -10,7 +10,7 @@ addr :: RemoteAddr
 addr = (0, 6000)
 
 main :: IO ()
-main = print =<< call addr echoInt . read . head =<< getArgs
+main = print =<< call addr swapM (1, 2)
 
 {-
   forM_ [1..] $ const $ do

@@ -74,7 +74,7 @@ class KMessage message scheme | message -> scheme where
   validate = (==) . scheme
   {-# INLINE validate #-}
 
-
+-- TODO Text -> ByteString
 -- TODO document that it is and how transferred
 data KError
     -- | Some error doesn't fit in any other category.
@@ -213,9 +213,13 @@ type KRemote = Socket
 withRemote :: (MonadBaseControl IO m, MonadIO m) => (KRemote -> m a) -> m a
 withRemote = bracket (liftIO (socket AF_INET Datagram defaultProtocol))
                      (liftIO .  sClose)
+{-# SPECIALIZE withRemote :: (KRemote -> IO a) -> IO a #-}
+
 
 maxMsgSize :: Int
 maxMsgSize = 16 * 1024
+{-# INLINE maxMsgSize #-}
+
 
 -- TODO eliminate toStrict
 sendMessage :: BEncodable msg => msg -> KRemoteAddr -> KRemote -> IO ()

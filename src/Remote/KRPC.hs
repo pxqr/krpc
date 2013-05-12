@@ -26,10 +26,12 @@ import Control.Monad
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Class
 import Data.BEncode
+import Data.ByteString.Char8 as BC
 import Data.List as L
 import Data.Map  as M
 import Data.Set  as S
 import Data.Text as T
+import Data.Text.Encoding as T
 import Data.Typeable
 import Network
 
@@ -47,14 +49,25 @@ type RemoteAddr = KRemoteAddr
 
 
 queryCall :: BEncodable param
+          => Extractable param
           => KRemote -> KRemoteAddr
           -> Method param result -> param -> IO ()
 queryCall sock addr m arg = sendMessage q addr sock
   where
-    q = kquery (L.head (methodName m)) [(L.head (methodParams m), toBEncode arg)]
+    q = kquery (methodName m) (mkVals (methodParams m) (injector arg))
+    mkVals = L.zip
+
+
+extractArgs :: [ParamName] -> Map ParamName BEncode -> Result [BEncode]
+extractArgs as d = mapM f as
+        where
+          f x | Just y <- M.lookup x d = return y
+              | otherwise            = Left ("not found key " ++ BC.unpack x)
+{-# INLINE extractArgs #-}
 
 -- TODO check scheme
 getResult :: BEncodable result
+          => Extractable result
           => KRemote -> KRemoteAddr
           -> Method param result -> IO result
 getResult sock addr m = do
@@ -62,15 +75,9 @@ getResult sock addr m = do
   case resp of
     Left e -> throw (RPCException e)
     Right (respVals -> dict) -> do
-      let valName = L.head (methodVals m)
-      case M.lookup valName dict of
-        Just val | Right res <- fromBEncode val -> return res
-        Nothing     -> throw (RPCException (ProtocolError msg))
-          where
-            msg = T.concat
-              [ "Unable to find return value: ", T.pack (show valName), "\n"
-              , "in response: ", T.pack (show dict)
-              ]
+      case extractArgs (methodVals m) dict >>= extractor of
+        Right vals -> return vals
+        Left  e    -> throw (RPCException (ProtocolError (T.pack e)))
 
 -- TODO async call
 -- | Makes remote procedure call. Throws RPCException if server
@@ -78,6 +85,7 @@ getResult sock addr m = do
 --
 call :: (MonadBaseControl IO host, MonadIO host)
      => (BEncodable param, BEncodable result)
+     => (Extractable param, Extractable result)
      => RemoteAddr
      -> Method param result
      -> param
@@ -92,6 +100,7 @@ newtype Async result = Async { waitResult :: IO result }
 -- TODO document errorneous usage
 async :: MonadIO host
       => (BEncodable param, BEncodable result)
+      => (Extractable param, Extractable result)
       => RemoteAddr
       -> Method param result
       -> param
@@ -104,52 +113,50 @@ async addr m arg = do
 
 await :: MonadIO host => Async result -> host result
 await = liftIO . waitResult
+{-# INLINE await #-}
 
-type HandlerBody remote = (BEncode -> remote (Result BEncode), KResponseScheme)
 
-type MethodHandler remote = (KQueryScheme, HandlerBody remote)
+type HandlerBody remote = KQuery -> remote (Either KError KResponse)
+
+type MethodHandler remote = (MethodName, HandlerBody remote)
 
 
 -- we can safely erase types in (==>)
 (==>) :: forall (remote :: * -> *) (param :: *) (result :: *).
-           (BEncodable param, BEncodable result)
+           (BEncodable param,  BEncodable result)
+        => (Extractable param, Extractable result)
         => Monad remote
         => Method param result
         -> (param -> remote result)
         -> MethodHandler remote
-m ==> body = (methodQueryScheme m, (newbody, methodRespScheme m))
+{-# INLINE (==>) #-}
+m ==> body = (methodName m, newbody)
   where
-    newbody x = case fromBEncode x of
-                    Right a -> liftM (Right . toBEncode) (body a)
-                    Left e  -> return (Left e)
+    {-# INLINE newbody #-}
+    newbody q =
+      case extractArgs (methodParams m) (queryArgs q) >>= extractor of
+        Left  e -> return (Left (ProtocolError (T.pack e)))
+        Right a -> do
+          r <- body a
+          return (Right (kresponse (mkVals (methodVals m) (injector r))))
 
+    mkVals :: [ValName] -> [BEncode] -> [(ValName, BEncode)]
+    mkVals = L.zip
 
 -- TODO: allow forkIO
--- TODO: allow overloading
 server :: (MonadBaseControl IO remote, MonadIO remote)
        => PortNumber
        -> [MethodHandler remote]
        -> remote ()
 server servport handlers = do
     remoteServer servport $ \_ q -> do
-      case dispatch (scheme q) of
-        Nothing -> return (Left (MethodUnknown "method"))
-        Just (m, rsc) -> do
-          let arg = snd (L.head (M.toList (queryArgs q)))
-
-          res <- invoke m arg
-          let valName = L.head (S.toList (rscVals rsc))
-          return $ bimap (ProtocolError . T.pack)
-                         (kresponse . return .  (,) valName) res
+      case dispatch (queryMethod q) of
+        Nothing -> return $ Left $ MethodUnknown (decodeUtf8 (queryMethod q))
+        Just  m -> invoke m q
   where
     handlerMap = M.fromList handlers
-
---    dispatch :: KQueryScheme -> MethodHandler remote
-    dispatch s | Just m <-  M.lookup s handlerMap = return m
-               | otherwise                        = Nothing
-
---    invoke :: MethodHandler remote -> BEncode -> remote BEncode
-    invoke m args = m args
+    dispatch s = M.lookup s handlerMap
+    invoke m q = m q
 
     bimap f _ (Left  x) = Left (f x)
     bimap _ g (Right x) = Right (g x)
