@@ -266,16 +266,3 @@ remoteServer servport action = bracket (liftIO bind) (liftIO . sClose) loop
           Right query -> (either toBEncode toBEncode <$> action addr query)
                         `catch` (return . toBEncode . serverError)
           Left decodeE   -> return $ toBEncode (ProtocolError (BC.pack decodeE))
-
-
--- TODO to bencodable
-instance (BEncodable a, BEncodable b) => BEncodable (a, b) where
-  {-# SPECIALIZE instance (BEncodable a, BEncodable b) => BEncodable (a, b) #-}
-  toBEncode (a, b) = BList [toBEncode a, toBEncode b]
-  {-# INLINE toBEncode #-}
-
-  fromBEncode be = case fromBEncode be of
-    Right [a, b] -> (,) <$> fromBEncode a <*> fromBEncode b
-    Right _      -> decodingError "Unable to decode a pair."
-    Left  e      -> Left e
-  {-# INLINE fromBEncode #-}
