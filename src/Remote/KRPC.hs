@@ -22,14 +22,12 @@ module Remote.KRPC
        ) where
 
 import Control.Exception
-import Control.Monad
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Class
 import Data.BEncode
 import Data.ByteString.Char8 as BC
 import Data.List as L
 import Data.Map  as M
-import Data.Set  as S
 import Data.Typeable
 import Network
 
@@ -121,8 +119,8 @@ type MethodHandler remote = (MethodName, HandlerBody remote)
 
 -- we can safely erase types in (==>)
 (==>) :: forall (remote :: * -> *) (param :: *) (result :: *).
-           (BEncodable param,  BEncodable result)
-        => (Extractable param, Extractable result)
+--           (BEncodable param,  BEncodable result)
+           (Extractable param, Extractable result)
         => Monad remote
         => Method param result
         -> (param -> remote result)

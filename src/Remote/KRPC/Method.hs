@@ -21,13 +21,8 @@ module Remote.KRPC.Method
        , Extractable(..)
        ) where
 
-import Prelude hiding ((.), id)
 import Control.Applicative
-import Control.Category
-import Control.Monad
 import Data.BEncode
-import Data.ByteString as B
-import Data.List as L
 import Data.Set as S
 
 import Remote.KRPC.Protocol
@@ -89,6 +84,7 @@ instance (BEncodable a, BEncodable b) => Extractable (a, b) where
   extractor [a, b] = (,) <$> fromBEncode a <*> fromBEncode b
   extractor _      = decodingError "unable to match pair"
   {-# INLINE extractor #-}
+
 {-
 instance BEncodable a => Extractable a where
   {-# SPECIALIZE instance BEncodable a => Extractable a #-}

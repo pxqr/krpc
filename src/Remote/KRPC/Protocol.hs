@@ -97,8 +97,8 @@ instance BEncodable KError where
     ]
 
   fromBEncode (BDict d)
-    |  M.lookup "y" d == Just (BString "e") =
-       uncurry mkKError <$> d >-- "e"
+    | M.lookup "y" d == Just (BString "e")
+    = uncurry mkKError <$> d >-- "e"
 
   fromBEncode _ = decodingError "KError"
 
