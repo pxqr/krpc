@@ -16,9 +16,6 @@ module Remote.KRPC.Method
 
          -- * Predefined methods
        , idM
-
-         -- * Internal
-       , Extractable(..)
        ) where
 
 import Control.Applicative
@@ -69,30 +66,3 @@ idM = method "id" ["x"] ["y"]
 method :: MethodName -> [ParamName] -> [ValName] -> Method param result
 method = Method
 {-# INLINE method #-}
-
-
-
-class Extractable a where
-  injector :: a -> [BEncode]
-  extractor :: [BEncode] -> Result a
-
-instance (BEncodable a, BEncodable b) => Extractable (a, b) where
-  {- SPECIALIZE instance (BEncodable a, BEncodable b) => Extractable (a, b) -}
-  injector (a, b) = [toBEncode a, toBEncode b]
-  {-# INLINE injector #-}
-
-  extractor [a, b] = (,) <$> fromBEncode a <*> fromBEncode b
-  extractor _      = decodingError "unable to match pair"
-  {-# INLINE extractor #-}
-
-{-
-instance BEncodable a => Extractable a where
-  {-# SPECIALIZE instance BEncodable a => Extractable a #-}
-
-  injector x = [toBEncode x]
-  {-# INLINE injector #-}
-
-  extractor [x] = fromBEncode x
-  extractor _   = decodingError "unable to match single value"
-  {-# INLINE extractor #-}
--}

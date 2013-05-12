@@ -21,6 +21,7 @@ module Remote.KRPC
        , (==>), server
        ) where
 
+import Control.Applicative
 import Control.Exception
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Class
@@ -39,31 +40,39 @@ data RPCException = RPCException KError
                   deriving (Show, Eq, Typeable)
 
 instance Exception RPCException
-
-
 type RemoteAddr = KRemoteAddr
+
+extractArgs :: BEncodable arg
+            => [ParamName] -> Map ParamName BEncode -> Result arg
+extractArgs as d = fromBEncode =<<
+  case as of
+    []  -> Right (BList [])
+    [x] -> f x
+    xs  -> BList <$> mapM f xs
+  where
+    f x = maybe (Left ("not found key " ++ BC.unpack x)) Right
+                (M.lookup x d)
+{-# INLINE extractArgs #-}
+
+injectVals :: BEncodable arg => [ParamName] -> arg -> [(ParamName, BEncode)]
+injectVals []  (toBEncode -> BList []) = []
+injectVals [p] (toBEncode -> arg)      = [(p, arg)]
+injectVals ps  (toBEncode -> BList as) = L.zip ps as
+injectVals _   _                       = error "KRPC.injectVals: impossible"
+{-# INLINE injectVals #-}
 
 
 queryCall :: BEncodable param
-          => Extractable param
           => KRemote -> KRemoteAddr
           -> Method param result -> param -> IO ()
 queryCall sock addr m arg = sendMessage q addr sock
   where
-    q = kquery (methodName m) (mkVals (methodParams m) (injector arg))
-    mkVals = L.zip
+    q = kquery (methodName m) (injectVals (methodParams m) arg)
 
 
-extractArgs :: [ParamName] -> Map ParamName BEncode -> Result [BEncode]
-extractArgs as d = mapM f as
-        where
-          f x | Just y <- M.lookup x d = return y
-              | otherwise            = Left ("not found key " ++ BC.unpack x)
-{-# INLINE extractArgs #-}
 
 -- TODO check scheme
 getResult :: BEncodable result
-          => Extractable result
           => KRemote -> KRemoteAddr
           -> Method param result -> IO result
 getResult sock addr m = do
@@ -71,7 +80,7 @@ getResult sock addr m = do
   case resp of
     Left e -> throw (RPCException e)
     Right (respVals -> dict) -> do
-      case extractArgs (methodVals m) dict >>= extractor of
+      case extractArgs (methodVals m) dict of
         Right vals -> return vals
         Left  e    -> throw (RPCException (ProtocolError (BC.pack e)))
 
@@ -81,7 +90,6 @@ getResult sock addr m = do
 --
 call :: (MonadBaseControl IO host, MonadIO host)
      => (BEncodable param, BEncodable result)
-     => (Extractable param, Extractable result)
      => RemoteAddr
      -> Method param result
      -> param
@@ -96,7 +104,6 @@ newtype Async result = Async { waitResult :: IO result }
 -- TODO document errorneous usage
 async :: MonadIO host
       => (BEncodable param, BEncodable result)
-      => (Extractable param, Extractable result)
       => RemoteAddr
       -> Method param result
       -> param
@@ -119,8 +126,7 @@ type MethodHandler remote = (MethodName, HandlerBody remote)
 
 -- we can safely erase types in (==>)
 (==>) :: forall (remote :: * -> *) (param :: *) (result :: *).
---           (BEncodable param,  BEncodable result)
-           (Extractable param, Extractable result)
+           (BEncodable param,  BEncodable result)
         => Monad remote
         => Method param result
         -> (param -> remote result)
@@ -130,14 +136,13 @@ m ==> body = (methodName m, newbody)
   where
     {-# INLINE newbody #-}
     newbody q =
-      case extractArgs (methodParams m) (queryArgs q) >>= extractor of
+      case extractArgs (methodParams m) (queryArgs q) of
         Left  e -> return (Left (ProtocolError (BC.pack e)))
         Right a -> do
           r <- body a
-          return (Right (kresponse (mkVals (methodVals m) (injector r))))
+          return (Right (kresponse (injectVals (methodVals m) r)))
 
-    mkVals :: [ValName] -> [BEncode] -> [(ValName, BEncode)]
-    mkVals = L.zip
+infix 1 ==>
 
 -- TODO: allow forkIO
 server :: (MonadBaseControl IO remote, MonadIO remote)
@@ -153,6 +158,3 @@ server servport handlers = do
     handlerMap = M.fromList handlers
     dispatch s = M.lookup s handlerMap
     invoke m q = m q
-
-    bimap f _ (Left  x) = Left (f x)
-    bimap _ g (Right x) = Right (g x)
