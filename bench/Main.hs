@@ -20,3 +20,8 @@ main = defaultMain $ map (mkbench 1)   [1, 10, 100, 1000, 32 * 1024]
   where
     mkbench r n = bench (show r ++ "/" ++ show n) $ nfIO $
                   replicateM r $ call addr echo (B.replicate n 0)
+
+{-
+  forM_ [1..] $ const $ do
+    async addr myconcat (replicate 100 [1..10])
+-}

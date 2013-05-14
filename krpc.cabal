@@ -42,18 +42,28 @@ library
 
 
 
-
-executable exsample-client
+test-suite test-client
+  type:                exitcode-stdio-1.0
   main-is:             Client.hs
   other-modules:       Shared
-  build-depends:       base        == 4.*, krpc, bytestring
-  hs-source-dirs:      examples
+  build-depends:       base        == 4.*
+                     , bytestring
+                     , krpc
 
-executable exsample-server
+                     , HUnit
+                     , test-framework
+                     , test-framework-hunit
+
+  hs-source-dirs:      tests
+
+executable test-server
   main-is:             Server.hs
   other-modules:       Shared
-  build-depends:       base        == 4.*, krpc, bytestring
-  hs-source-dirs:      examples
+  build-depends:       base        == 4.*
+                     , bytestring
+                     , krpc
+
+  hs-source-dirs:      tests
 
 
 
