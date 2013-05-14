@@ -5,7 +5,7 @@ but might be used anywhere else.
 
 # Description
 
-KRPC basically consisting of bencoded dictionraies sent over UDP. This
+KRPC basically consisting of bencoded dictionaries sent over UDP. This
 implementation provides extra safiety by separation of procedure
 signature | implementation and baking procedure type in host
 language, thus it's hard to shoot yourself in the foot accidently.
