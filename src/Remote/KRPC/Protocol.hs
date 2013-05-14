@@ -6,7 +6,7 @@
 --   Portability :  portable
 --
 --   This module provides straightforward implementation of KRPC
---   protocol. In many situations Network.KRPC should be prefered
+--   protocol. In many situations 'Network.KRPC' should be prefered
 --   since it gives more safe, convenient and high level api.
 --
 --   > See http://www.bittorrent.org/beps/bep_0005.html#krpc-protocol
@@ -176,7 +176,7 @@ withRemote = bracket (liftIO (socket AF_INET Datagram defaultProtocol))
 
 
 maxMsgSize :: Int
-maxMsgSize = 16 * 1024
+maxMsgSize = 512
 {-# INLINE maxMsgSize #-}
 
 

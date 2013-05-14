@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Shared
-       (echoM, unitM, swapM, reverseM, shiftR
+       (echoM, echoBytes, unitM, swapM, reverseM, shiftR
        ) where
 
+import Data.ByteString (ByteString)
 import Remote.KRPC
 
 unitM :: Method () ()
@@ -10,6 +11,9 @@ unitM = method "unit" [] []
 
 echoM :: Method Int Int
 echoM = method "echo" ["x"] ["x"]
+
+echoBytes :: Method ByteString ByteString
+echoBytes = method "echoBytes" ["x"] ["x"]
 
 reverseM :: Method [Int] [Int]
 reverseM = method "reverse" ["xs"] ["ys"]

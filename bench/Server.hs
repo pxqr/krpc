@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
+import Data.ByteString (ByteString)
 import Remote.KRPC
 
 
-echo :: Method [Int] [Int]
+echo :: Method ByteString ByteString
 echo = method "echo" ["x"] ["x"]
 
 main :: IO ()
