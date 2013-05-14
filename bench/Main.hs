@@ -15,11 +15,21 @@ echo :: Method ByteString ByteString
 echo = method "echo" ["x"] ["x"]
 
 main :: IO ()
-main = defaultMain $ map (mkbench 1)   [1, 10, 100, 1000, 32 * 1024]
-                 ++  map (mkbench 10)  [1, 10, 100, 1000]
+main = withRemote $ \remote -> do {
+  ; let sizes = [10, 100, 1000, 10000, 16 * 1024]
+  ; let repetitions = [1, 10, 100, 1000]
+  ; let params = [(r, s) | r <- repetitions, s <- sizes]
+  ; let benchmarks = (concatMap (\(a, b) -> [a, b]) $ zip
+                   (map (uncurry (mkbench remote)) params)
+                   (map (uncurry (mkbench_ remote)) params))
+  ; defaultMain benchmarks
+  }
   where
-    mkbench r n = bench (show r ++ "/" ++ show n) $ nfIO $
+    mkbench _ r n = bench (show r ++ "/" ++ show n) $ nfIO $
                   replicateM r $ call addr echo (B.replicate n 0)
+
+    mkbench_ re r n = bench (show r ++ "/" ++ show n) $ nfIO $
+                  replicateM r $ call_ re addr echo (B.replicate n 0)
 
 {-
   forM_ [1..] $ const $ do

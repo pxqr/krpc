@@ -162,11 +162,6 @@ kresponse = KResponse . M.fromList
 
 type KRemoteAddr = (HostAddress, PortNumber)
 
-remoteAddr :: KRemoteAddr -> SockAddr
-remoteAddr = SockAddrInet <$> snd <*> fst
-{-# INLINE remoteAddr #-}
-
-
 type KRemote = Socket
 
 withRemote :: (MonadBaseControl IO m, MonadIO m) => (KRemote -> m a) -> m a
@@ -176,8 +171,11 @@ withRemote = bracket (liftIO (socket AF_INET Datagram defaultProtocol))
 
 
 maxMsgSize :: Int
-maxMsgSize = 512
 {-# INLINE maxMsgSize #-}
+-- release
+--maxMsgSize = 512 -- size of payload of one udp packet
+-- bench
+maxMsgSize = 64 * 1024 -- max udp size
 
 
 -- TODO eliminate toStrict
@@ -189,9 +187,8 @@ sendMessage msg (host, port) sock =
 
 
 -- TODO check scheme
-recvResponse :: KRemoteAddr -> KRemote -> IO (Either KError KResponse)
-recvResponse addr sock = do
-  connect sock (remoteAddr addr)
+recvResponse :: KRemote -> IO (Either KError KResponse)
+recvResponse sock = do
   (raw, _) <- recvFrom sock maxMsgSize
   return $ case decoded raw of
     Right resp -> Right resp

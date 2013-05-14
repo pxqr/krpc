@@ -100,6 +100,10 @@ module Remote.KRPC
 
          -- * Server
        , MethodHandler, (==>), server
+
+         -- * Internal
+       , call_
+       , withRemote
        ) where
 
 import Control.Applicative
@@ -186,7 +190,8 @@ injectVals ps  (toBEncode -> BList as) = L.zip ps as
 injectVals _   _                       = error "KRPC.injectVals: impossible"
 {-# INLINE injectVals #-}
 
-
+-- | Alias to Socket, through might change in future.
+type Remote = Socket
 
 -- | Represent any error mentioned by protocol specification that
 --   'call', 'await' might throw.
@@ -208,10 +213,10 @@ queryCall sock addr m arg = sendMessage q addr sock
     q = kquery (methodName m) (injectVals (methodParams m) arg)
 
 getResult :: BEncodable result
-          => KRemote -> KRemoteAddr
+          => KRemote
           -> Method param result -> IO result
-getResult sock addr m = do
-  resp <- recvResponse addr sock
+getResult sock m = do
+  resp <- recvResponse sock
   case resp of
     Left e -> throw (RPCException e)
     Right (respVals -> dict) -> do
@@ -228,9 +233,19 @@ call :: (MonadBaseControl IO host, MonadIO host)
      -> Method param result -- ^ Procedure to call.
      -> param               -- ^ Arguments passed by callee to procedure.
      -> host result         -- ^ Values returned by callee from the procedure.
-call addr m arg = liftIO $ withRemote $ \sock -> do
+call addr m arg = liftIO $ withRemote $ \sock -> do call_ sock addr m arg
+
+-- | The same as 'call' but use already opened socket.
+call_ :: (MonadBaseControl IO host, MonadIO host)
+     => (BEncodable param, BEncodable result)
+     => Remote              -- ^ Socket to use
+     -> RemoteAddr          -- ^ Address of callee.
+     -> Method param result -- ^ Procedure to call.
+     -> param               -- ^ Arguments passed by callee to procedure.
+     -> host result         -- ^ Values returned by callee from the procedure.
+call_ sock addr m arg = liftIO $ do
   queryCall sock addr m arg
-  getResult sock addr m
+  getResult sock m
 
 
 -- | Asynchonous result typically get from 'async' call. Used to defer
@@ -265,7 +280,7 @@ async addr m arg = do
   liftIO $ withRemote $ \sock ->
      queryCall sock addr m arg
   return $ Async $ withRemote $ \sock ->
-     getResult sock addr m
+     getResult sock m
 
 -- | Will wait until the callee finished processing of procedure call
 --   and return its results. Throws 'RPCException' on any error
