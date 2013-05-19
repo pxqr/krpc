@@ -19,7 +19,7 @@ module Remote.KRPC.Protocol
        (
 
          -- * Error
-         KError(..), errorCode, mkKError
+         KError(..), ErrorCode, errorCode, mkKError
 
          -- * Query
        , KQuery(queryMethod, queryArgs), MethodName, ParamName, kquery
