@@ -1,8 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
+import Control.Concurrent
+import Control.Exception
 import qualified Data.ByteString as B
 import System.Environment
+import System.Process
+import System.FilePath
 
 import Test.HUnit hiding (Test)
 import Test.Framework
@@ -15,8 +19,20 @@ import Shared
 addr :: RemoteAddr
 addr = (0, 6000)
 
+withServ :: FilePath -> IO () -> IO ()
+withServ serv_path = bracket up terminateProcess . const
+  where
+    up = do
+      (_, _, _, h) <- createProcess (proc serv_path [])
+      threadDelay 1000000
+      return h
+
 main :: IO ()
-main = defaultMain tests
+main = do
+  let serv_path = "dist" </> "build" </> "test-server" </> "test-server"
+  withServ serv_path $
+    defaultMain tests
+
 
 (==?) :: (Eq a, Show a) => a -> IO a -> Assertion
 expected ==? action = do

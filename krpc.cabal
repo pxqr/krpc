@@ -48,6 +48,9 @@ test-suite test-client
   other-modules:       Shared
   build-depends:       base        == 4.*
                      , bytestring
+                     , process
+                     , filepath
+
                      , krpc
 
                      , HUnit
