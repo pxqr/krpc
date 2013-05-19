@@ -7,7 +7,7 @@
 --
 --   This module provides message scheme validation for core protocol
 --   messages from 'Remote.KRPC.Procotol'. This module should be used
---   with 'Remote.KRPC.Protocol', otherwise (if you use 'Remote.KRPC')
+--   with 'Remote.KRPC.Protocol', otherwise (if you are using 'Remote.KRPC')
 --   this module seems to be useless.
 --
 {-# LANGUAGE DefaultSignatures #-}
@@ -15,14 +15,16 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 module Remote.KRPC.Scheme
        ( KMessage(..)
-       , KQueryScheme(..)
-       , KResponseScheme(..)
+       , KQueryScheme(..), methodQueryScheme
+       , KResponseScheme(..), methodRespScheme
        ) where
 
+import Control.Applicative
 import Data.Map as M
-import Data.Set
+import Data.Set as S
 
 import Remote.KRPC.Protocol
+import Remote.KRPC
 
 
 -- | Used to validate any message by its scheme
@@ -57,6 +59,11 @@ instance KMessage KQuery KQueryScheme where
   scheme q = KQueryScheme (queryMethod q) (M.keysSet (queryArgs q))
   {-# INLINE scheme #-}
 
+methodQueryScheme :: Method a b -> KQueryScheme
+methodQueryScheme = KQueryScheme <$> methodName
+                                 <*> S.fromList . methodParams
+{-# INLINE methodQueryScheme #-}
+
 
 newtype KResponseScheme = KResponseScheme {
     rscVals :: Set ValName
@@ -66,3 +73,7 @@ instance KMessage KResponse KResponseScheme where
   {-# SPECIALIZE instance KMessage KResponse KResponseScheme #-}
   scheme = KResponseScheme . keysSet . respVals
   {-# INLINE scheme #-}
+
+methodRespScheme :: Method a b -> KResponseScheme
+methodRespScheme = KResponseScheme . S.fromList . methodVals
+{-# INLINE methodRespScheme #-}
