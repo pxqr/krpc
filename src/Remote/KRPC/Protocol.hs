@@ -206,8 +206,6 @@ sendMessage msg (host, port) sock =
 {-# INLINE sendMessage #-}
 {-# SPECIALIZE sendMessage :: BEncode -> KRemoteAddr -> KRemote -> IO ()  #-}
 
-
--- TODO check scheme
 recvResponse :: KRemote -> IO (Either KError KResponse)
 recvResponse sock = do
   (raw, _) <- recvFrom sock maxMsgSize
@@ -217,10 +215,11 @@ recvResponse sock = do
       Right kerror -> kerror
       _ -> ProtocolError (BC.pack decE)
 
-
+-- | Run server using a given port. Method invocation should be done manually.
 remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
-             => PortNumber
+             => PortNumber -- ^ Port number to listen.
              -> (KRemoteAddr -> KQuery -> remote (Either KError KResponse))
+             -- ^ Handler.
              -> remote ()
 remoteServer servport action = bracket (liftIO bind) (liftIO . sClose) loop
   where
