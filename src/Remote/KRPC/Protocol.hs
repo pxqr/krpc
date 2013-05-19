@@ -53,8 +53,14 @@ import Network.Socket hiding (recvFrom)
 import Network.Socket.ByteString
 
 
--- TODO Text -> ByteString
--- TODO document that it is and how transferred
+-- | Errors used to signal that some error occurred while processing a
+-- procedure call. Error may be send only from server to client but
+-- not in the opposite direction.
+--
+--   Errors are encoded as bencoded dictionary:
+--
+--   { "y" : "e", "e" : [<error_code>, <human_readable_error_reason>] }
+--
 data KError
     -- | Some error doesn't fit in any other category.
   = GenericError { errorMessage :: ByteString }
@@ -107,7 +113,14 @@ serverError = ServerError . BC.pack . show
 type MethodName = ByteString
 type ParamName  = ByteString
 
--- TODO document that it is and how transferred
+-- | Query used to signal that caller want to make procedure call to
+-- callee and pass arguments in. Therefore query may be only sent from
+-- client to server but not in the opposite direction.
+--
+--   Queries are encoded as bencoded dictionary:
+--
+--     { "y" : "q", "q" : "<method_name>", "a" : [<arg1>, <arg2>, ...] }
+--
 data KQuery = KQuery {
     queryMethod :: MethodName
   , queryArgs   :: Map ParamName BEncode
@@ -136,7 +149,15 @@ kquery name args = KQuery name (M.fromList args)
 
 type ValName = ByteString
 
--- TODO document that it is and how transferred
+-- | KResponse used to signal that callee successufully process a
+-- procedure call and to return values from procedure. KResponse should
+-- not be sent if error occurred during RPC. Thus KResponse may be only
+-- sent from server to client.
+--
+--   Responses are encoded as bencoded dictionary:
+--
+--     { "y" : "r", "r" : [<val1>, <val2>, ...] }
+--
 newtype KResponse = KResponse {
     respVals :: Map ValName BEncode
   } deriving (Show, Read, Eq, Ord)
