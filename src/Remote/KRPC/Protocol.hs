@@ -76,11 +76,14 @@ data KError
    deriving (Show, Read, Eq, Ord)
 
 instance BEncodable KError where
-  toBEncode e = fromAssocs
-    [ "y" --> ("e" :: ByteString)
-    , "e" --> (errorCode e, errorMessage e)
+  {-# SPECIALIZE instance BEncodable KError #-}
+  {-# INLINE toBEncode #-}
+  toBEncode e = fromAscAssocs -- WARN: keep keys sorted
+    [ "e" --> (errorCode e, errorMessage e)
+    , "y" --> ("e" :: ByteString)
     ]
 
+  {-# INLINE fromBEncode #-}
   fromBEncode (BDict d)
     | M.lookup "y" d == Just (BString "e")
     = uncurry mkKError <$> d >-- "e"
@@ -127,12 +130,15 @@ data KQuery = KQuery {
   } deriving (Show, Read, Eq, Ord)
 
 instance BEncodable KQuery where
-  toBEncode (KQuery m args) = fromAssocs
-    [ "y" --> ("q" :: ByteString)
+  {-# SPECIALIZE instance BEncodable KQuery #-}
+  {-# INLINE toBEncode #-}
+  toBEncode (KQuery m args) = fromAscAssocs -- WARN: keep keys sorted
+    [ "a" --> BDict args
     , "q" --> m
-    , "a" --> BDict args
+    , "y" --> ("q" :: ByteString)
     ]
 
+  {-# INLINE fromBEncode #-}
   fromBEncode (BDict d)
     | M.lookup "y" d == Just (BString "q") =
       KQuery <$> d >-- "q"
@@ -163,11 +169,14 @@ newtype KResponse = KResponse {
   } deriving (Show, Read, Eq, Ord)
 
 instance BEncodable KResponse where
-  toBEncode (KResponse vals) = fromAssocs
-    [ "y" --> ("r" :: ByteString)
-    , "r" --> vals
+  {-# SPECIALIZE instance BEncodable KResponse #-}
+  {-# INLINE toBEncode #-}
+  toBEncode (KResponse vals) = fromAscAssocs  -- WARN: keep keys sorted
+    [ "r" --> vals
+    , "y" --> ("r" :: ByteString)
     ]
 
+  {-# INLINE fromBEncode #-}
   fromBEncode (BDict d)
     | M.lookup "y" d == Just (BString "r") =
       KResponse <$> d >-- "r"
