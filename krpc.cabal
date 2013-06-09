@@ -5,7 +5,7 @@ license-file:          LICENSE
 author:                Sam T.
 maintainer:            Sam T. <pxqr.sta@gmail.com>
 copyright:             (c) 2013, Sam T.
-category:              Network, Remote
+category:              Network
 build-type:            Simple
 cabal-version:         >=1.8
 homepage:              https://github.com/pxqr/krpc
@@ -15,7 +15,7 @@ description:           KRPC remote procedure call protocol implementation.
 
 source-repository head
   type:                git
-  location:            https://github.com/pxqr/krpc.git
+  location:            git://github.com/pxqr/krpc.git
 
 
 
@@ -76,7 +76,7 @@ executable bench-server
   main-is:             Server.hs
   build-depends:       base        == 4.*, krpc, bytestring
   hs-source-dirs:      bench
-  ghc-options:         -O2 -fforce-recomp
+  ghc-options:         -fforce-recomp
 
 benchmark bench-client
   type:                exitcode-stdio-1.0
