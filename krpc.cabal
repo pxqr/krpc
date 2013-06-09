@@ -11,7 +11,14 @@ cabal-version:         >=1.8
 homepage:              https://github.com/pxqr/krpc
 bug-reports:           https://github.com/pxqr/krpc/issues
 synopsis:              KRPC remote procedure call protocol implementation.
-description:           KRPC remote procedure call protocol implementation.
+description:
+
+  KRPC remote procedure call protocol implementation.
+  .
+  [/Release Notes/]
+  .
+    * /0.1.0.0:/ Initial version.
+
 
 source-repository head
   type:                git
