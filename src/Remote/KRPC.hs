@@ -136,6 +136,13 @@ import Remote.KRPC.Protocol
 --     exsample @Method (Foo, Bar) (Bar, Foo)@ will take two arguments
 --     and return two values.
 --
+--  To pass raw dictionaries you should specify empty param list:
+--
+--    > method "my_method" [] [] :: Method BEncode BEncode
+--
+--  In this case you should handle dictionary extraction by hand, both
+--  in client and server.
+--
 data Method param result = Method {
     -- | Name used in query.
     methodName   :: MethodName
