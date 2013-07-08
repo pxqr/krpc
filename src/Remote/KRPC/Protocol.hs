@@ -60,7 +60,7 @@ import Network.Socket.ByteString
 --
 --   Errors are encoded as bencoded dictionary:
 --
---   { "y" : "e", "e" : [<error_code>, <human_readable_error_reason>] }
+--   > { "y" : "e", "e" : [<error_code>, <human_readable_error_reason>] }
 --
 data KError
     -- | Some error doesn't fit in any other category.
@@ -123,7 +123,7 @@ type ParamName  = ByteString
 --
 --   Queries are encoded as bencoded dictionary:
 --
---     { "y" : "q", "q" : "<method_name>", "a" : [<arg1>, <arg2>, ...] }
+--    > { "y" : "q", "q" : "<method_name>", "a" : [<arg1>, <arg2>, ...] }
 --
 data KQuery = KQuery {
     queryMethod :: MethodName
@@ -163,7 +163,7 @@ type ValName = ByteString
 --
 --   Responses are encoded as bencoded dictionary:
 --
---     { "y" : "r", "r" : [<val1>, <val2>, ...] }
+--   > { "y" : "r", "r" : [<val1>, <val2>, ...] }
 --
 newtype KResponse = KResponse {
     respVals :: Map ValName BEncode
