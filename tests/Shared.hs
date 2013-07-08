@@ -1,9 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Shared
-       (echoM, echoBytes, unitM, swapM, reverseM, shiftR
+       ( echoM
+       , echoBytes
+       , unitM
+       , swapM
+       , reverseM
+       , shiftR
+       , rawM
        ) where
 
 import Data.ByteString (ByteString)
+import Data.BEncode
 import Remote.KRPC
 
 unitM :: Method () ()
@@ -23,3 +30,6 @@ swapM = method "swap" ["x", "y"] ["b", "a"]
 
 shiftR :: Method ((), Int, [Int]) ([Int], (), Int)
 shiftR = method "shiftR" ["x", "y", "z"] ["a", "b", "c"]
+
+rawM :: Method BEncode BEncode
+rawM = method "rawM" [""] [""]

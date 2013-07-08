@@ -4,6 +4,7 @@ module Main (main) where
 import Control.Concurrent
 import Control.Exception
 import qualified Data.ByteString as B
+import Data.BEncode
 import System.Environment
 import System.Process
 import System.FilePath
@@ -65,4 +66,7 @@ tests =
   , testCase "echo bytestring" $
       let bs = B.replicate 400 0 in
       bs ==? call addr echoBytes bs
+
+  , testCase "raw method" $
+      BInteger 10 ==? call addr rawM (BInteger 10)
   ]

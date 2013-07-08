@@ -1,6 +1,7 @@
 {-# LANGUAGE IncoherentInstances #-}
 module Main (main) where
 
+import Data.BEncode
 import Remote.KRPC
 import Shared
 
@@ -13,4 +14,5 @@ main = server 6000
   , swapM ==> \(a, b) -> return (b, a)
   , reverseM ==> return . reverse
   , shiftR ==> \(a, b, c) -> return (c, a, b)
+  , rawM      ==> return
   ]

@@ -43,7 +43,6 @@ library
 
                      , network      >= 2.3
 
-
   hs-source-dirs:      src
   extensions:          PatternGuards
   ghc-options:         -Wall
@@ -59,6 +58,7 @@ test-suite test-client
                      , process
                      , filepath
 
+                     , bencoding
                      , krpc
 
                      , HUnit
@@ -72,6 +72,7 @@ executable test-server
   other-modules:       Shared
   build-depends:       base        == 4.*
                      , bytestring
+                     , bencoding
                      , krpc
 
   hs-source-dirs:      tests
@@ -89,5 +90,5 @@ benchmark bench-client
   type:                exitcode-stdio-1.0
   main-is:             Main.hs
   hs-source-dirs:      bench
-  build-depends:       base == 4.5.*, krpc, criterion, bytestring
+  build-depends:       base == 4.*, krpc, criterion, bytestring
   ghc-options:         -O2 -fforce-recomp
