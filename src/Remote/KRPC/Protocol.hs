@@ -36,9 +36,8 @@ module Remote.KRPC.Protocol
        , encode, encoded, decode, decoded, toBEncode, fromBEncode
        ) where
 
-import Prelude hiding (catch)
 import Control.Applicative
-import Control.Exception.Lifted
+import Control.Exception.Lifted as Lifted
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
@@ -213,7 +212,6 @@ sendMessage :: BEncodable msg => msg -> KRemoteAddr -> KRemote -> IO ()
 sendMessage msg (host, port) sock =
   sendAllTo sock (LB.toStrict (encoded msg)) (SockAddrInet port host)
 {-# INLINE sendMessage #-}
-{-# SPECIALIZE sendMessage :: BEncode -> KRemoteAddr -> KRemote -> IO ()  #-}
 
 recvResponse :: KRemote -> IO (Either KError KResponse)
 recvResponse sock = do
@@ -230,9 +228,9 @@ remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
              -> (KRemoteAddr -> KQuery -> remote (Either KError KResponse))
              -- ^ Handler.
              -> remote ()
-remoteServer servport action = bracket (liftIO bind) (liftIO . sClose) loop
+remoteServer servport action = bracket (liftIO bindServ) (liftIO . sClose) loop
   where
-    bind = do
+    bindServ = do
      sock <- socket AF_INET Datagram defaultProtocol
      bindSocket sock (SockAddrInet servport iNADDR_ANY)
      return sock
@@ -249,5 +247,5 @@ remoteServer servport action = bracket (liftIO bind) (liftIO . sClose) loop
       where
         handleMsg bs addr = case decoded bs of
           Right query -> (either toBEncode toBEncode <$> action addr query)
-                        `catch` (return . toBEncode . serverError)
+                        `Lifted.catch` (return . toBEncode . serverError)
           Left decodeE   -> return $ toBEncode (ProtocolError (BC.pack decodeE))

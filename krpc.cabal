@@ -8,6 +8,8 @@ copyright:             (c) 2013, Sam T.
 category:              Network
 build-type:            Simple
 cabal-version:         >=1.8
+tested-with:           GHC == 7.4.1
+                     , GHC == 7.6.3
 homepage:              https://github.com/pxqr/krpc
 bug-reports:           https://github.com/pxqr/krpc/issues
 synopsis:              KRPC remote procedure call protocol implementation.
