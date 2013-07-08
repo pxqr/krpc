@@ -10,9 +10,10 @@
 --   with 'Remote.KRPC.Protocol', otherwise (if you are using 'Remote.KRPC')
 --   this module seems to be useless.
 --
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE DefaultSignatures      #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Remote.KRPC.Scheme
        ( KMessage(..)
        , KQueryScheme(..), methodQueryScheme

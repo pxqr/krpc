@@ -11,10 +11,12 @@
 --
 --   > See http://www.bittorrent.org/beps/bep_0005.html#krpc-protocol
 --
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE FlexibleContexts, TypeSynonymInstances #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
-{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE DefaultSignatures      #-}
 module Remote.KRPC.Protocol
        (
 

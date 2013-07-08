@@ -84,10 +84,12 @@
 --
 --   For protocol details see 'Remote.KRPC.Protocol' module.
 --
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts, DeriveDataTypeable #-}
-{-# LANGUAGE ExplicitForAll, KindSignatures #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ExplicitForAll     #-}
+{-# LANGUAGE KindSignatures     #-}
+{-# LANGUAGE ViewPatterns       #-}
 module Remote.KRPC
        ( -- * Method
          Method(..)
