@@ -170,31 +170,22 @@ method :: MethodName -> [ParamName] -> [ValName] -> Method param result
 method = Method
 {-# INLINE method #-}
 
+lookupKey :: ParamName -> Map ByteString BEncode -> Result BEncode
+lookupKey x = maybe (Left ("not found key " ++ BC.unpack x)) Right . M.lookup x
 
-extractArgs :: BEncodable arg
-            => [ParamName] -> Map ParamName BEncode -> Result arg
-extractArgs as d = fromBEncode =<<
-  case as of
-    []  -> if M.null d
-           then Right (BList [])
-           else Right (BDict d)
-    [x] -> f x
-    xs  -> BList <$> mapM f xs
-  where
-    f x = maybe (Left ("not found key " ++ BC.unpack x)) Right
-                (M.lookup x d)
+extractArgs :: [ParamName] -> Map ParamName BEncode -> Result BEncode
+extractArgs []  d = Right $ if M.null d then  BList [] else BDict d
+extractArgs [x] d = lookupKey x d
+extractArgs xs  d = BList <$> mapM (`lookupKey` d) xs
 {-# INLINE extractArgs #-}
 
-injectVals :: BEncodable arg => [ParamName] -> arg -> [(ParamName, BEncode)]
-injectVals []  (toBEncode -> be)
-  = case be of
-     BList []   -> []
-     BDict d    -> M.toList d
-     _          -> invalidParamList [] be
-
-injectVals [p] (toBEncode -> arg)      = [(p, arg)]
-injectVals ps  (toBEncode -> BList as) = L.zip ps as
-injectVals pl  a                       = invalidParamList pl (toBEncode a)
+injectVals :: [ParamName] -> BEncode -> [(ParamName, BEncode)]
+injectVals []  (BList []) = []
+injectVals []  (BDict d ) = M.toList d
+injectVals []   be        = invalidParamList [] be
+injectVals [p]  arg       = [(p, arg)]
+injectVals ps  (BList as) = L.zip ps as
+injectVals ps   be        = invalidParamList ps be
 {-# INLINE injectVals #-}
 
 invalidParamList :: [ParamName] -> BEncode -> a
@@ -222,7 +213,7 @@ queryCall :: BEncodable param
           -> Method param result -> param -> IO ()
 queryCall sock addr m arg = sendMessage q addr sock
   where
-    q = kquery (methodName m) (injectVals (methodParams m) arg)
+    q = kquery (methodName m) (injectVals (methodParams m) (toBEncode arg))
 
 getResult :: BEncodable result
           => KRemote
@@ -232,7 +223,7 @@ getResult sock m = do
   case resp of
     Left e -> throw (RPCException e)
     Right (respVals -> dict) -> do
-      case extractArgs (methodVals m) dict of
+      case fromBEncode =<< extractArgs (methodVals m) dict of
         Right vals -> return vals
         Left  e    -> throw (RPCException (ProtocolError (BC.pack e)))
 
@@ -323,11 +314,11 @@ m ==> body = (methodName m, newbody)
   where
     {-# INLINE newbody #-}
     newbody q =
-      case extractArgs (methodParams m) (queryArgs q) of
+      case fromBEncode =<< extractArgs (methodParams m) (queryArgs q) of
         Left  e -> return (Left (ProtocolError (BC.pack e)))
         Right a -> do
           r <- body a
-          return (Right (kresponse (injectVals (methodVals m) r)))
+          return (Right (kresponse (injectVals (methodVals m) (toBEncode r))))
 
 infix 1 ==>
 
