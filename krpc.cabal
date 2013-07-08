@@ -1,5 +1,5 @@
 name:                  krpc
-version:               0.1.0.0
+version:               0.1.1.0
 license:               MIT
 license-file:          LICENSE
 author:                Sam T.
@@ -20,7 +20,8 @@ description:
   [/Release Notes/]
   .
     * /0.1.0.0:/ Initial version.
-
+  .
+    * /0.1.1.0:/ Allow passing raw argument\/result dictionaries.
 
 source-repository head
   type:                git
