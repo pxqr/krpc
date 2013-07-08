@@ -175,7 +175,9 @@ extractArgs :: BEncodable arg
             => [ParamName] -> Map ParamName BEncode -> Result arg
 extractArgs as d = fromBEncode =<<
   case as of
-    []  -> Right (BList [])
+    []  -> if M.null d
+           then Right (BList [])
+           else Right (BDict d)
     [x] -> f x
     xs  -> BList <$> mapM f xs
   where
@@ -184,11 +186,21 @@ extractArgs as d = fromBEncode =<<
 {-# INLINE extractArgs #-}
 
 injectVals :: BEncodable arg => [ParamName] -> arg -> [(ParamName, BEncode)]
-injectVals []  (toBEncode -> BList []) = []
+injectVals []  (toBEncode -> be)
+  = case be of
+     BList []   -> []
+     BDict d    -> M.toList d
+     _          -> invalidParamList [] be
+
 injectVals [p] (toBEncode -> arg)      = [(p, arg)]
 injectVals ps  (toBEncode -> BList as) = L.zip ps as
-injectVals _   _                       = error "KRPC.injectVals: impossible"
+injectVals pl  a                       = invalidParamList pl (toBEncode a)
 {-# INLINE injectVals #-}
+
+invalidParamList :: [ParamName] -> BEncode -> a
+invalidParamList pl be
+  = error $ "KRPC invalid parameter list: " ++ show pl ++ "\n" ++
+            "while procedure args are: "    ++ show be
 
 -- | Alias to Socket, through might change in future.
 type Remote = Socket

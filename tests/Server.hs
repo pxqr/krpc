@@ -15,4 +15,5 @@ main = server 6000
   , reverseM ==> return . reverse
   , shiftR ==> \(a, b, c) -> return (c, a, b)
   , rawM      ==> return
+  , rawDictM  ==> return
   ]

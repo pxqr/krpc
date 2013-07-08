@@ -7,6 +7,7 @@ module Shared
        , reverseM
        , shiftR
        , rawM
+       , rawDictM
        ) where
 
 import Data.ByteString (ByteString)
@@ -33,3 +34,6 @@ shiftR = method "shiftR" ["x", "y", "z"] ["a", "b", "c"]
 
 rawM :: Method BEncode BEncode
 rawM = method "rawM" [""] [""]
+
+rawDictM :: Method BEncode BEncode
+rawDictM = method "m" [] []

@@ -5,6 +5,7 @@ import Control.Concurrent
 import Control.Exception
 import qualified Data.ByteString as B
 import Data.BEncode
+import Data.Map
 import System.Environment
 import System.Process
 import System.FilePath
@@ -69,4 +70,11 @@ tests =
 
   , testCase "raw method" $
       BInteger 10 ==? call addr rawM (BInteger 10)
+
+  , testCase "raw dict" $
+      let dict = BDict $ fromList
+                 [ ("some_int", BInteger 100)
+                 , ("some_list", BList [BInteger 10])
+                 ]
+      in dict ==? call addr rawDictM dict
   ]
