@@ -37,5 +37,5 @@ This library is written and maintained by Sam T. <pxqr.sta@gmail.com>
 Feel free to report bugs and suggestions via github issue tracker or the mail.
 
 [spec]:        http://www.bittorrent.org/beps/bep_0005.html#krpc-protocol
-[status-img]:  https://travis-ci.org/pxqr/krpc.png
-[status-link]: https://travis-ci.org/pxqr/krpc
+[status-img]:  https://travis-ci.org/cobit/krpc.png
+[status-link]: https://travis-ci.org/cobit/krpc
