@@ -10,6 +10,6 @@
 * DONE return scheme back
 * DONE add Show instance for Method
 * DONE add BEncodable instance for Method
-* TODO remove async api
-* TODO expose client addr in server-side
+* DONE remove async api
+* TODO expose client addr in server-side handlers
 * TODO major version bump (reason: exported type changed)

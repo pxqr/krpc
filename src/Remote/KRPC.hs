@@ -80,6 +80,8 @@
 --   Here we implement method signature from that shared lib and run
 --   server with runServer by passing method table in.
 --
+--   For async API use /async/ package, old API have been removed.
+--
 --   For more examples see @exsamples@ or @tests@ directories.
 --
 --   For protocol details see 'Remote.KRPC.Protocol' module.
@@ -100,10 +102,12 @@ module Remote.KRPC
          -- * Client
        , RemoteAddr
        , RPCException(..)
-       , call, Async, async, await
+       , call
 
          -- * Server
-       , MethodHandler, (==>), server
+       , MethodHandler
+       , (==>)
+       , server
 
          -- * Internal
        , call_
@@ -299,51 +303,6 @@ call_ :: (MonadBaseControl IO host, MonadIO host)
 call_ sock addr m arg = liftIO $ do
   queryCall sock addr m arg
   getResult sock m
-
-
--- | Asynchonous result typically get from 'async' call. Used to defer
--- return values transfer.
-newtype Async result = Async { waitResult :: IO result }
-
-
--- | Query procedure call but not wait for its results. This function
---   returns 'Async' value which is handle to procedure result. Actual
---   result might be obtained with 'await'. Unable to throw
---   'RPCException', this might happen in 'await' if at all.
---
---   Note that sending multiple queries at the same time to the one
---   remote is not recommended. For exsample in the following scenario:
---
---   >  aa <- async theRemote ....
---   >  ab <- async theRemote ....
---   >  a  <- await ab
---   >  b  <- await ab
---
---   it's likely that the /a/ and /b/ values will be mixed up. So in
---   order to get correct results you need to make 'await' before the
---   next 'async'.
---
-async :: MonadIO host
-      => (BEncodable param, BEncodable result)
-      => RemoteAddr          -- ^ Address of callee.
-      -> Method param result -- ^ Procedure to call.
-      -> param               -- ^ Arguments passed by callee to procedure.
-      -> host (Async result) -- ^ Handle to result.
-async addr m arg = do
-  liftIO $ withRemote $ \sock ->
-     queryCall sock addr m arg
-  return $ Async $ withRemote $ \sock ->
-     getResult sock m
-
--- | Will wait until the callee finished processing of procedure call
---   and return its results. Throws 'RPCException' on any error
---   occurred.
-await :: MonadIO host
-      => Async result -- ^ Obtained from the corresponding 'async'.
-      -> host result  -- ^ Result values of the procedure call quered
-                      --   with 'async'.
-await = liftIO . waitResult
-{-# INLINE await #-}
 
 
 type HandlerBody remote = KQuery -> remote (Either KError KResponse)
