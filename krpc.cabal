@@ -1,5 +1,5 @@
 name:                  krpc
-version:               0.1.1.0
+version:               0.2.0.0
 license:               MIT
 license-file:          LICENSE
 author:                Sam T.
@@ -22,6 +22,9 @@ description:
     * /0.1.0.0:/ Initial version.
   .
     * /0.1.1.0:/ Allow passing raw argument\/result dictionaries.
+  .
+    * /0.2.0.0:/ Async API have been removed, use /async/ package instead.
+                 Expose caller address in handlers.
 
 source-repository head
   type:                git
