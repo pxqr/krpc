@@ -1,0 +1,14 @@
+* DONE document protocol
+* DONE Ascending everywhere
+* DONE document KRPC module
+* DONE move exsamples to tests
+* DONE make HUnit tests
+* DONE run server in test automatically
+* DONE use one socket everywhere
+* DONE fix performance issues
+* DONE add readme
+* DONE return scheme back
+* TODO add show instance for method
+* TODO hide async api
+* TODO expose client addr in server-side
+* TODO major version bump (reason: exported type changed)
