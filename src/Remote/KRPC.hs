@@ -107,6 +107,7 @@ module Remote.KRPC
          -- * Server
        , MethodHandler
        , (==>)
+       , (==>@)
        , server
 
          -- * Internal
@@ -125,7 +126,6 @@ import Data.Map  as M
 import Data.Monoid
 import Data.Typeable
 import Network
-
 import GHC.Generics
 
 import Remote.KRPC.Protocol
@@ -305,7 +305,7 @@ call_ sock addr m arg = liftIO $ do
   getResult sock m
 
 
-type HandlerBody remote = KQuery -> remote (Either KError KResponse)
+type HandlerBody remote = KRemoteAddr -> KQuery -> remote (Either KError KResponse)
 
 -- | Procedure signature and implementation binded up.
 type MethodHandler remote = (MethodName, HandlerBody remote)
@@ -319,17 +319,28 @@ type MethodHandler remote = (MethodName, HandlerBody remote)
         -> (param -> remote result) -- ^ Implementation.
         -> MethodHandler remote     -- ^ Handler used by server.
 {-# INLINE (==>) #-}
-m ==> body = (methodName m, newbody)
+m ==> body = m ==>@ const body
+infix 1 ==>
+
+-- | Similar to '==>@' but additionally pass caller address.
+(==>@)  :: forall (remote :: * -> *) (param :: *) (result :: *).
+           (BEncodable param,  BEncodable result)
+        => Monad remote
+        => Method param result      -- ^ Signature.
+        -> (KRemoteAddr -> param -> remote result) -- ^ Implementation.
+        -> MethodHandler remote     -- ^ Handler used by server.
+{-# INLINE (==>@) #-}
+m ==>@ body = (methodName m, newbody)
   where
     {-# INLINE newbody #-}
-    newbody q =
+    newbody addr q =
       case fromBEncode =<< extractArgs (methodParams m) (queryArgs q) of
         Left  e -> return (Left (ProtocolError (BC.pack e)))
         Right a -> do
-          r <- body a
+          r <- body addr a
           return (Right (kresponse (injectVals (methodVals m) (toBEncode r))))
 
-infix 1 ==>
+infix 1 ==>@
 
 -- TODO: allow forkIO
 
@@ -342,11 +353,10 @@ server :: (MonadBaseControl IO remote, MonadIO remote)
        -> [MethodHandler remote]  -- ^ Method table.
        -> remote ()
 server servport handlers = do
-    remoteServer servport $ \_ q -> do
+    remoteServer servport $ \addr q -> do
       case dispatch (queryMethod q) of
         Nothing -> return $ Left $ MethodUnknown (queryMethod q)
-        Just  m -> invoke m q
+        Just  m -> m addr q
   where
     handlerMap = M.fromList handlers
     dispatch s = M.lookup s handlerMap
-    invoke m q = m q

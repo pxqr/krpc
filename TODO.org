@@ -11,5 +11,5 @@
 * DONE add Show instance for Method
 * DONE add BEncodable instance for Method
 * DONE remove async api
-* TODO expose client addr in server-side handlers
-* TODO major version bump (reason: exported type changed)
+* DONE expose client addr in server-side handlers
+* TODO major version bump to 0.2.0.0 (reason: async API removed)
