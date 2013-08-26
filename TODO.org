@@ -12,4 +12,5 @@
 * DONE add BEncodable instance for Method
 * DONE remove async api
 * DONE expose client addr in server-side handlers
-* TODO major version bump to 0.2.0.0 (reason: async API removed)
+* DONE major version bump to 0.2.0.0 (reason: async API removed)
+* TODO ipv6 support
