@@ -9,7 +9,7 @@
 * DONE add readme
 * DONE return scheme back
 * DONE add Show instance for Method
-* TODO add BEncodable instance for Method
-* TODO hide async api
+* DONE add BEncodable instance for Method
+* TODO remove async api
 * TODO expose client addr in server-side
 * TODO major version bump (reason: exported type changed)

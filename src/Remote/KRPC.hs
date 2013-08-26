@@ -91,6 +91,7 @@
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric       #-}
 module Remote.KRPC
        ( -- * Method
          Method(..)
@@ -121,7 +122,10 @@ import Data.Monoid
 import Data.Typeable
 import Network
 
+import GHC.Generics
+
 import Remote.KRPC.Protocol
+
 
 -- | Method datatype used to describe name, parameters and return
 --   values of procedure. Client use a method to /invoke/, server
@@ -154,7 +158,9 @@ data Method param result = Method {
 
     -- | Name of each return value in /right to left/ order.
   , methodVals   :: [ValName]
-  }
+  } deriving (Eq, Ord, Generic)
+
+instance BEncodable (Method a b)
 
 instance (Typeable a, Typeable b) => Show (Method a b) where
   showsPrec _ = showsMethod
