@@ -29,8 +29,13 @@ description:
 source-repository head
   type:                git
   location:            git://github.com/cobit/krpc.git
+  branch:              master
 
-
+source-repository this
+  type:                git
+  location:            git://github.com/cobit/krpc.git
+  branch:              master
+  tag:                 v0.2.1.0
 
 library
   default-language:    Haskell2010
