@@ -9,7 +9,7 @@
 --   protocol. In many situations 'Network.KRPC' should be prefered
 --   since it gives more safe, convenient and high level api.
 --
---   > See http://www.bittorrent.org/beps/bep_0005.html#krpc-protocol
+--   See <http://www.bittorrent.org/beps/bep_0005.html#krpc-protocol>
 --
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE FlexibleContexts       #-}
