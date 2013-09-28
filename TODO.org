@@ -13,4 +13,5 @@
 * DONE remove async api
 * DONE expose client addr in server-side handlers
 * DONE major version bump to 0.2.0.0 (reason: async API removed)
+* TODO Remote.* -> Network.*
 * TODO ipv6 support
