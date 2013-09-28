@@ -26,16 +26,14 @@ description.
 For usage see examples in ```examples``` directory.
 For documentation see haddock generated documentation.
 
-### Build Status
+### Build Status [![Build Status][status-img]][status-link]
 
-[![Build Status][status-img]][status-link]
+### Maintainer <pxqr.sta@gmail.com>
 
-### Maintainer
-
-This library is written and maintained by Sam T. <pxqr.sta@gmail.com>
-
-Feel free to report bugs and suggestions via github issue tracker or the mail.
+Feel free to report bugs and suggestions via github
+[issue tracker][issues] or the mail.
 
 [spec]:        http://www.bittorrent.org/beps/bep_0005.html#krpc-protocol
 [status-img]:  https://travis-ci.org/cobit/krpc.png
 [status-link]: https://travis-ci.org/cobit/krpc
+[issues]:      https://github.com/cobit/krpc/issues
