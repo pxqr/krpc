@@ -17,14 +17,7 @@ description:
 
   KRPC remote procedure call protocol implementation.
   .
-  [/Release Notes/]
-  .
-    * /0.1.0.0:/ Initial version.
-  .
-    * /0.1.1.0:/ Allow passing raw argument\/result dictionaries.
-  .
-    * /0.2.0.0:/ Async API have been removed, use /async/ package instead.
-                 Expose caller address in handlers.
+  See NEWS.md for release notes.
 
 source-repository head
   type:                git
