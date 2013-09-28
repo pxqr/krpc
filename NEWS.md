@@ -3,3 +3,5 @@
 * 0.2.0.0: Async API have been removed, use /async/ package instead.
            Expose caller address in handlers.
 * 0.2.2.0: Use bencoding-0.2.2.*
+* 0.3.0.0: Use bencoding-0.3.*
+           Rename Remote.* to Network.* modules.
