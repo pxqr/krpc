@@ -4,8 +4,6 @@ notifications:
   email: false
 
 install:
-  - git clone https://github.com/cobit/bencoding.git
-  - cd bencoding && cabal install --force-reinstalls && cd ..
   - cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls
 
 script:
