@@ -164,7 +164,7 @@ data Method param result = Method {
   , methodVals   :: [ValName]
   } deriving (Eq, Ord, Generic)
 
-instance BEncodable (Method a b)
+instance BEncode (Method a b)
 
 instance (Typeable a, Typeable b) => Show (Method a b) where
   showsPrec _ = showsMethod
@@ -224,16 +224,16 @@ method :: MethodName -> [ParamName] -> [ValName] -> Method param result
 method = Method
 {-# INLINE method #-}
 
-lookupKey :: ParamName -> Map ByteString BEncode -> Result BEncode
+lookupKey :: ParamName -> BDict -> Result BValue
 lookupKey x = maybe (Left ("not found key " ++ BC.unpack x)) Right . M.lookup x
 
-extractArgs :: [ParamName] -> Map ParamName BEncode -> Result BEncode
+extractArgs :: [ParamName] -> BDict -> Result BValue
 extractArgs []  d = Right $ if M.null d then  BList [] else BDict d
 extractArgs [x] d = lookupKey x d
 extractArgs xs  d = BList <$> mapM (`lookupKey` d) xs
 {-# INLINE extractArgs #-}
 
-injectVals :: [ParamName] -> BEncode -> [(ParamName, BEncode)]
+injectVals :: [ParamName] -> BValue -> [(ParamName, BValue)]
 injectVals []  (BList []) = []
 injectVals []  (BDict d ) = M.toList d
 injectVals []   be        = invalidParamList [] be
@@ -242,7 +242,7 @@ injectVals ps  (BList as) = L.zip ps as
 injectVals ps   be        = invalidParamList ps be
 {-# INLINE injectVals #-}
 
-invalidParamList :: [ParamName] -> BEncode -> a
+invalidParamList :: [ParamName] -> BValue -> a
 invalidParamList pl be
   = error $ "KRPC invalid parameter list: " ++ show pl ++ "\n" ++
             "while procedure args are: "    ++ show be
@@ -262,14 +262,14 @@ instance Exception RPCException
 -- | Address of remote can be called by client.
 type RemoteAddr = KRemoteAddr
 
-queryCall :: BEncodable param
+queryCall :: BEncode param
           => KRemote -> KRemoteAddr
           -> Method param result -> param -> IO ()
 queryCall sock addr m arg = sendMessage q addr sock
   where
     q = kquery (methodName m) (injectVals (methodParams m) (toBEncode arg))
 
-getResult :: BEncodable result
+getResult :: BEncode result
           => KRemote
           -> Method param result -> IO result
 getResult sock m = do
@@ -285,7 +285,7 @@ getResult sock m = do
 -- | Makes remote procedure call. Throws RPCException on any error
 -- occurred.
 call :: (MonadBaseControl IO host, MonadIO host)
-     => (BEncodable param, BEncodable result)
+     => (BEncode param, BEncode result)
      => RemoteAddr          -- ^ Address of callee.
      -> Method param result -- ^ Procedure to call.
      -> param               -- ^ Arguments passed by callee to procedure.
@@ -294,7 +294,7 @@ call addr m arg = liftIO $ withRemote $ \sock -> do call_ sock addr m arg
 
 -- | The same as 'call' but use already opened socket.
 call_ :: (MonadBaseControl IO host, MonadIO host)
-     => (BEncodable param, BEncodable result)
+     => (BEncode param, BEncode result)
      => Remote              -- ^ Socket to use
      -> RemoteAddr          -- ^ Address of callee.
      -> Method param result -- ^ Procedure to call.
@@ -313,7 +313,7 @@ type MethodHandler remote = (MethodName, HandlerBody remote)
 -- we can safely erase types in (==>)
 -- | Assign method implementation to the method signature.
 (==>) :: forall (remote :: * -> *) (param :: *) (result :: *).
-           (BEncodable param,  BEncodable result)
+           (BEncode param,  BEncode result)
         => Monad remote
         => Method param result      -- ^ Signature.
         -> (param -> remote result) -- ^ Implementation.
@@ -324,7 +324,7 @@ infix 1 ==>
 
 -- | Similar to '==>@' but additionally pass caller address.
 (==>@)  :: forall (remote :: * -> *) (param :: *) (result :: *).
-           (BEncodable param,  BEncodable result)
+           (BEncode param,  BEncode result)
         => Monad remote
         => Method param result      -- ^ Signature.
         -> (KRemoteAddr -> param -> remote result) -- ^ Implementation.

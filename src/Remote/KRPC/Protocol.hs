@@ -74,8 +74,8 @@ data KError
   | MethodUnknown { errorMessage :: ByteString }
    deriving (Show, Read, Eq, Ord)
 
-instance BEncodable KError where
-  {-# SPECIALIZE instance BEncodable KError #-}
+instance BEncode KError where
+  {-# SPECIALIZE instance BEncode KError #-}
   {-# INLINE toBEncode #-}
   toBEncode e = fromAscAssocs -- WARN: keep keys sorted
     [ "e" --> (errorCode e, errorMessage e)
@@ -125,11 +125,11 @@ type ParamName  = ByteString
 --
 data KQuery = KQuery {
     queryMethod :: MethodName
-  , queryArgs   :: Map ParamName BEncode
+  , queryArgs   :: Map ParamName BValue
   } deriving (Show, Read, Eq, Ord)
 
-instance BEncodable KQuery where
-  {-# SPECIALIZE instance BEncodable KQuery #-}
+instance BEncode KQuery where
+  {-# SPECIALIZE instance BEncode KQuery #-}
   {-# INLINE toBEncode #-}
   toBEncode (KQuery m args) = fromAscAssocs -- WARN: keep keys sorted
     [ "a" --> BDict args
@@ -145,7 +145,7 @@ instance BEncodable KQuery where
 
   fromBEncode _ = decodingError "KQuery"
 
-kquery :: MethodName -> [(ParamName, BEncode)] -> KQuery
+kquery :: MethodName -> [(ParamName, BValue)] -> KQuery
 kquery name args = KQuery name (M.fromList args)
 {-# INLINE kquery #-}
 
@@ -163,12 +163,10 @@ type ValName = ByteString
 --
 --   > { "y" : "r", "r" : [<val1>, <val2>, ...] }
 --
-newtype KResponse = KResponse {
-    respVals :: Map ValName BEncode
-  } deriving (Show, Read, Eq, Ord)
+newtype KResponse = KResponse { respVals :: BDict }
+  deriving (Show, Read, Eq, Ord)
 
-instance BEncodable KResponse where
-  {-# SPECIALIZE instance BEncodable KResponse #-}
+instance BEncode KResponse where
   {-# INLINE toBEncode #-}
   toBEncode (KResponse vals) = fromAscAssocs  -- WARN: keep keys sorted
     [ "r" --> vals
@@ -183,7 +181,7 @@ instance BEncodable KResponse where
   fromBEncode _ = decodingError "KDict"
 
 
-kresponse :: [(ValName, BEncode)] -> KResponse
+kresponse :: [(ValName, BValue)] -> KResponse
 kresponse = KResponse . M.fromList
 {-# INLINE kresponse #-}
 
@@ -208,7 +206,7 @@ maxMsgSize = 64 * 1024 -- max udp size
 
 
 -- TODO eliminate toStrict
-sendMessage :: BEncodable msg => msg -> KRemoteAddr -> KRemote -> IO ()
+sendMessage :: BEncode msg => msg -> KRemoteAddr -> KRemote -> IO ()
 sendMessage msg (host, port) sock =
   sendAllTo sock (LB.toStrict (encoded msg)) (SockAddrInet port host)
 {-# INLINE sendMessage #-}

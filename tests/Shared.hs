@@ -32,8 +32,8 @@ swapM = method "swap" ["x", "y"] ["b", "a"]
 shiftR :: Method ((), Int, [Int]) ([Int], (), Int)
 shiftR = method "shiftR" ["x", "y", "z"] ["a", "b", "c"]
 
-rawM :: Method BEncode BEncode
+rawM :: Method BValue BValue
 rawM = method "rawM" [""] [""]
 
-rawDictM :: Method BEncode BEncode
+rawDictM :: Method BValue BValue
 rawDictM = method "m" [] []
