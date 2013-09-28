@@ -1,5 +1,5 @@
 name:                  krpc
-version:               0.2.0.0
+version:               0.2.2.0
 license:               BSD3
 license-file:          LICENSE
 author:                Sam Truzjan
@@ -35,7 +35,7 @@ source-repository this
   type:                git
   location:            git://github.com/cobit/krpc.git
   branch:              master
-  tag:                 v0.2.0.0
+  tag:                 v0.2.2.0
 
 library
   default-language:    Haskell2010
