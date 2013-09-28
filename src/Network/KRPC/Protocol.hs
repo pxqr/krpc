@@ -19,21 +19,38 @@
 {-# LANGUAGE DefaultSignatures      #-}
 module Network.KRPC.Protocol
        ( -- * Error
-         KError(..), ErrorCode, errorCode, mkKError
+         KError(..)
+       , ErrorCode
+       , errorCode
+       , mkKError
 
          -- * Query
-       , KQuery(queryMethod, queryArgs), MethodName, ParamName, kquery
+       , KQuery(queryMethod, queryArgs)
+       , MethodName
+       , ParamName
+       , kquery
 
          -- * Response
-       , KResponse(respVals), ValName, kresponse
+       , KResponse(respVals)
+       , ValName
+       , kresponse
 
-       , sendMessage, recvResponse
+       , sendMessage
+       , recvResponse
 
          -- * Remote
-       , KRemote, KRemoteAddr, withRemote, remoteServer
+       , KRemote
+       , KRemoteAddr
+       , withRemote
+       , remoteServer
 
          -- * Re-exports
-       , encode, encoded, decode, decoded, toBEncode, fromBEncode
+       , encode
+       , encoded
+       , decode
+       , decoded
+       , toBEncode
+       , fromBEncode
        ) where
 
 import Control.Applicative
