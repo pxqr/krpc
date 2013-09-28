@@ -2,7 +2,7 @@
 module Main (main) where
 
 import Data.BEncode
-import Remote.KRPC
+import Network.KRPC
 import Shared
 
 

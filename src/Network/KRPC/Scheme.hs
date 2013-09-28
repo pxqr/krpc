@@ -14,7 +14,7 @@
 {-# LANGUAGE TypeSynonymInstances   #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE FunctionalDependencies #-}
-module Remote.KRPC.Scheme
+module Network.KRPC.Scheme
        ( KMessage(..)
        , KQueryScheme(..), methodQueryScheme
        , KResponseScheme(..), methodRespScheme
@@ -24,8 +24,8 @@ import Control.Applicative
 import Data.Map as M
 import Data.Set as S
 
-import Remote.KRPC.Protocol
-import Remote.KRPC
+import Network.KRPC.Protocol
+import Network.KRPC
 
 
 -- | Used to validate any message by its scheme

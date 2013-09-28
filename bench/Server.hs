@@ -2,7 +2,7 @@
 module Main (main) where
 
 import Data.ByteString (ByteString)
-import Remote.KRPC
+import Network.KRPC
 
 
 echo :: Method ByteString ByteString

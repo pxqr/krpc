@@ -38,9 +38,9 @@ library
   default-extensions:  PatternGuards
                      , RecordWildCards
   hs-source-dirs:      src
-  exposed-modules:     Remote.KRPC
-                     , Remote.KRPC.Protocol
-                     , Remote.KRPC.Scheme
+  exposed-modules:     Network.KRPC
+                     , Network.KRPC.Protocol
+                     , Network.KRPC.Scheme
   build-depends:       base          == 4.*
 
                      , lifted-base   >= 0.1.1

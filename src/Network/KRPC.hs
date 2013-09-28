@@ -94,7 +94,7 @@
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveGeneric       #-}
-module Remote.KRPC
+module Network.KRPC
        ( -- * Method
          Method(..)
        , method, idM
@@ -128,7 +128,7 @@ import Data.Typeable
 import Network
 import GHC.Generics
 
-import Remote.KRPC.Protocol
+import Network.KRPC.Protocol
 
 
 -- | Method datatype used to describe name, parameters and return

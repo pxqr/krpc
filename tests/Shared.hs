@@ -12,7 +12,7 @@ module Shared
 
 import Data.ByteString (ByteString)
 import Data.BEncode
-import Remote.KRPC
+import Network.KRPC
 
 unitM :: Method () ()
 unitM = method "unit" [] []

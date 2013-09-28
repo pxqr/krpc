@@ -5,7 +5,7 @@ import Control.Monad
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Criterion.Main
-import Remote.KRPC
+import Network.KRPC
 
 
 addr :: RemoteAddr

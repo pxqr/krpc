@@ -17,7 +17,7 @@
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE DefaultSignatures      #-}
-module Remote.KRPC.Protocol
+module Network.KRPC.Protocol
        ( -- * Error
          KError(..), ErrorCode, errorCode, mkKError
 
