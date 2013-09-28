@@ -19,6 +19,9 @@ description:
   .
   See NEWS.md for release notes.
 
+extra-source-files:    README.md
+                     , NEWS.md
+
 source-repository head
   type:                git
   location:            git://github.com/cobit/krpc.git
