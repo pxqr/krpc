@@ -6,10 +6,11 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Criterion.Main
 import Network.KRPC
+import Network.Socket
 
 
 addr :: RemoteAddr
-addr = (0, 6000)
+addr = SockAddrInet 6000 0
 
 echo :: Method ByteString ByteString
 echo = method "echo" ["x"] ["x"]

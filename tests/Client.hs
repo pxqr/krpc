@@ -15,11 +15,12 @@ import Test.Framework
 import Test.Framework.Providers.HUnit
 
 import Network.KRPC
+import Network.Socket
 import Shared
 
 
 addr :: RemoteAddr
-addr = (0, 6000)
+addr = SockAddrInet 6000 0
 
 withServ :: FilePath -> IO () -> IO ()
 withServ serv_path = bracket up terminateProcess . const

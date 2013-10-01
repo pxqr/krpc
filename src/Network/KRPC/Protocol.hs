@@ -202,10 +202,7 @@ kresponse :: [(ValName, BValue)] -> KResponse
 kresponse = KResponse . M.fromList
 {-# INLINE kresponse #-}
 
-
-
-type KRemoteAddr = (HostAddress, PortNumber)
-
+type KRemoteAddr = SockAddr
 type KRemote = Socket
 
 withRemote :: (MonadBaseControl IO m, MonadIO m) => (KRemote -> m a) -> m a
@@ -224,8 +221,7 @@ maxMsgSize = 64 * 1024 -- max udp size
 
 -- TODO eliminate toStrict
 sendMessage :: BEncode msg => msg -> KRemoteAddr -> KRemote -> IO ()
-sendMessage msg (host, port) sock =
-  sendAllTo sock (LB.toStrict (encoded msg)) (SockAddrInet port host)
+sendMessage msg addr sock = sendAllTo sock (LB.toStrict (encoded msg)) addr
 {-# INLINE sendMessage #-}
 
 recvResponse :: KRemote -> IO (Either KError KResponse)
@@ -239,26 +235,21 @@ recvResponse sock = do
 
 -- | Run server using a given port. Method invocation should be done manually.
 remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
-             => PortNumber -- ^ Port number to listen.
+             => KRemoteAddr -- ^ Port number to listen.
              -> (KRemoteAddr -> KQuery -> remote (Either KError KResponse))
              -- ^ Handler.
              -> remote ()
-remoteServer servport action = bracket (liftIO bindServ) (liftIO . sClose) loop
+remoteServer servAddr action = bracket (liftIO bindServ) (liftIO . sClose) loop
   where
     bindServ = do
      sock <- socket AF_INET Datagram defaultProtocol
-     bindSocket sock (SockAddrInet servport iNADDR_ANY)
+     bindSocket sock servAddr
      return sock
 
     loop sock = forever $ do
-      (bs, addr) <- liftIO $ recvFrom sock maxMsgSize
-      case addr of
-        SockAddrInet port host -> do
-           let kaddr = (host, port)
-           reply <- handleMsg bs kaddr
-           liftIO $ sendMessage reply kaddr sock
-        _ -> return ()
-
+        (bs, addr) <- liftIO $ recvFrom sock maxMsgSize
+        reply <- handleMsg bs addr
+        liftIO $ sendMessage reply addr sock
       where
         handleMsg bs addr = case decoded bs of
           Right query -> (either toBEncode toBEncode <$> action addr query)

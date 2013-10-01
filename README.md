@@ -13,6 +13,10 @@ language, thus it's hard to shoot yourself in the foot accidently.
 See bittorrent DHT [specification][spec] for detailed protocol
 description.
 
+### Example
+
+TODO
+
 #### Modules
 
 * Remote.KRPC — simple interface which reduce all RPC related stuff to

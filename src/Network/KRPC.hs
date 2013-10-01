@@ -97,7 +97,8 @@
 module Network.KRPC
        ( -- * Method
          Method(..)
-       , method, idM
+       , method
+       , idM
 
          -- * Client
        , RemoteAddr
@@ -349,11 +350,11 @@ infix 1 ==>@
 --   it will not create new thread for each connection.
 --
 server :: (MonadBaseControl IO remote, MonadIO remote)
-       => PortNumber              -- ^ Port used to accept incoming connections.
+       => KRemoteAddr             -- ^ Port used to accept incoming connections.
        -> [MethodHandler remote]  -- ^ Method table.
        -> remote ()
-server servport handlers = do
-    remoteServer servport $ \addr q -> do
+server servAddr handlers = do
+    remoteServer servAddr $ \addr q -> do
       case dispatch (queryMethod q) of
         Nothing -> return $ Left $ MethodUnknown (queryMethod q)
         Just  m -> m addr q

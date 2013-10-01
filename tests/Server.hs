@@ -3,11 +3,12 @@ module Main (main) where
 
 import Data.BEncode
 import Network.KRPC
+import Network.Socket
 import Shared
 
 
 main :: IO ()
-main = server 6000
+main = server (SockAddrInet 6000 0)
   [ unitM ==> return
   , echoM ==> return
   , echoBytes ==> return
