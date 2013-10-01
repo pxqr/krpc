@@ -242,9 +242,9 @@ remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
 remoteServer servAddr action = bracket (liftIO bindServ) (liftIO . sClose) loop
   where
     bindServ = do
-     sock <- socket AF_INET Datagram defaultProtocol
-     bindSocket sock servAddr
-     return sock
+        sock <- socket AF_INET Datagram defaultProtocol
+        bindSocket sock servAddr
+        return sock
 
     loop sock = forever $ do
         (bs, addr) <- liftIO $ recvFrom sock maxMsgSize
