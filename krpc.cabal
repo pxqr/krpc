@@ -16,11 +16,9 @@ synopsis:              KRPC remote procedure call protocol implementation.
 description:
 
   KRPC remote procedure call protocol implementation.
-  .
-  See NEWS.md for release notes.
 
 extra-source-files:    README.md
-                     , CHANGELOG
+                     , changelog
 
 source-repository head
   type:                git
