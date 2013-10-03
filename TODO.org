@@ -14,4 +14,4 @@
 * DONE expose client addr in server-side handlers
 * DONE major version bump to 0.2.0.0 (reason: async API removed)
 * DONE Remote.* -> Network.*
-* TODO ipv6 support
+* DONE ipv6 support
