@@ -126,8 +126,6 @@ mkKError _   = GenericError
 serverError :: SomeException -> KError
 serverError = ServerError . BC.pack . show
 
--- TODO Asc everywhere
-
 
 type MethodName = ByteString
 type ParamName  = ByteString

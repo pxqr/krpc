@@ -343,8 +343,6 @@ m ==>@ body = (methodName m, newbody)
 
 infix 1 ==>@
 
--- TODO: allow forkIO
-
 -- | Run RPC server on specified port by using list of handlers.
 --   Server will dispatch procedure specified by callee, but note that
 --   it will not create new thread for each connection.
