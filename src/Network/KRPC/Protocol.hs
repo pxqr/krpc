@@ -205,19 +205,20 @@ kresponse = KResponse . M.fromList
 type KRemoteAddr = SockAddr
 type KRemote = Socket
 
+sockAddrFamily :: SockAddr -> Family
+sockAddrFamily (SockAddrInet  _ _    ) = AF_INET
+sockAddrFamily (SockAddrInet6 _ _ _ _) = AF_INET6
+sockAddrFamily (SockAddrUnix  _      ) = AF_UNIX
+
 withRemote :: (MonadBaseControl IO m, MonadIO m) => (KRemote -> m a) -> m a
-withRemote = bracket (liftIO (socket AF_INET Datagram defaultProtocol))
+withRemote = bracket (liftIO (socket AF_INET6 Datagram defaultProtocol))
                      (liftIO .  sClose)
 {-# SPECIALIZE withRemote :: (KRemote -> IO a) -> IO a #-}
 
-
 maxMsgSize :: Int
+--maxMsgSize = 512 -- release: size of payload of one udp packet
+maxMsgSize = 64 * 1024 -- bench: max UDP MTU
 {-# INLINE maxMsgSize #-}
--- release
---maxMsgSize = 512 -- size of payload of one udp packet
--- bench
-maxMsgSize = 64 * 1024 -- max udp size
-
 
 -- TODO eliminate toStrict
 sendMessage :: BEncode msg => msg -> KRemoteAddr -> KRemote -> IO ()
@@ -242,7 +243,10 @@ remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
 remoteServer servAddr action = bracket (liftIO bindServ) (liftIO . sClose) loop
   where
     bindServ = do
-        sock <- socket AF_INET Datagram defaultProtocol
+        let family = sockAddrFamily servAddr
+        sock <- socket family Datagram defaultProtocol
+        when (family == AF_INET6) $ do
+          setSocketOption sock IPv6Only 0
         bindSocket sock servAddr
         return sock
 
