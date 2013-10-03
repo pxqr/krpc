@@ -220,9 +220,8 @@ maxMsgSize :: Int
 maxMsgSize = 64 * 1024 -- bench: max UDP MTU
 {-# INLINE maxMsgSize #-}
 
--- TODO eliminate toStrict
 sendMessage :: BEncode msg => msg -> KRemoteAddr -> KRemote -> IO ()
-sendMessage msg addr sock = sendAllTo sock (LB.toStrict (encoded msg)) addr
+sendMessage msg addr sock = sendManyTo sock (LB.toChunks (encoded msg)) addr
 {-# INLINE sendMessage #-}
 
 recvResponse :: KRemote -> IO (Either KError KResponse)
