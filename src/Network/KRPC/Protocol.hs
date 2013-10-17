@@ -157,7 +157,9 @@ instance BEncode KQuery where
   {-# INLINE fromBEncode #-}
   fromBEncode bv @ (BDict d)
     | BE.lookup "y" d == Just (BString "q") = (`fromDict` bv) $ do
-      KQuery <$>! "q" <*>! "a"
+      a <- field (req "a")
+      q <- field (req "q")
+      return $! KQuery q a
 
   fromBEncode _ = decodingError "KQuery"
 
