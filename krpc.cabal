@@ -40,13 +40,12 @@ library
                      , Network.KRPC.Protocol
                      , Network.KRPC.Scheme
   build-depends:       base          == 4.*
+                     , bytestring   >= 0.10
 
                      , lifted-base   >= 0.1.1
                      , transformers  >= 0.2
                      , monad-control >= 0.3
 
-                     , bytestring   >= 0.10
-                     , containers   >= 0.4
                      , bencoding    == 0.4.*
 
                      , network      >= 2.3

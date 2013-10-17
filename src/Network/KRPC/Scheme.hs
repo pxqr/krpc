@@ -23,7 +23,6 @@ module Network.KRPC.Scheme
 import Control.Applicative
 import Data.BEncode.BDict as BS
 import Data.BEncode.Types as BS
-import Data.Set as S
 
 import Network.KRPC.Protocol
 import Network.KRPC
@@ -51,7 +50,7 @@ instance KMessage KError ErrorCode where
 
 data KQueryScheme = KQueryScheme {
     qscMethod :: MethodName
-  , qscParams :: Set ParamName
+  , qscParams :: [ParamName]
   } deriving (Show, Read, Eq, Ord)
 
 bdictKeys :: BDict -> [BKey]
@@ -61,24 +60,23 @@ bdictKeys  Nil          = []
 instance KMessage KQuery KQueryScheme where
   scheme q = KQueryScheme
              { qscMethod = queryMethod q
-             , qscParams = S.fromAscList $ bdictKeys $ queryArgs q
+             , qscParams = bdictKeys $ queryArgs q
              }
   {-# INLINE scheme #-}
 
 methodQueryScheme :: Method a b -> KQueryScheme
-methodQueryScheme = KQueryScheme <$> methodName
-                                 <*> S.fromList . methodParams
+methodQueryScheme = KQueryScheme <$> methodName <*> methodParams
 {-# INLINE methodQueryScheme #-}
 
 newtype KResponseScheme = KResponseScheme
-  { rscVals :: Set ValName
+  { rscVals :: [ValName]
   } deriving (Show, Read, Eq, Ord)
 
 instance KMessage KResponse KResponseScheme where
   {-# SPECIALIZE instance KMessage KResponse KResponseScheme #-}
-  scheme = KResponseScheme . S.fromAscList . bdictKeys . respVals
+  scheme = KResponseScheme . bdictKeys . respVals
   {-# INLINE scheme #-}
 
 methodRespScheme :: Method a b -> KResponseScheme
-methodRespScheme = KResponseScheme . S.fromList . methodVals
+methodRespScheme = KResponseScheme . methodVals
 {-# INLINE methodRespScheme #-}

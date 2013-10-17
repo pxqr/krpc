@@ -125,7 +125,6 @@ import Data.BEncode.BDict as BE
 import Data.BEncode.Types as BE
 import Data.ByteString.Char8 as BC
 import Data.List as L
-import Data.Map  as M
 import Data.Monoid
 import Data.Typeable
 import Network
@@ -359,9 +358,6 @@ server :: (MonadBaseControl IO remote, MonadIO remote)
        -> remote ()
 server servAddr handlers = do
     remoteServer servAddr $ \addr q -> do
-      case dispatch (queryMethod q) of
+      case L.lookup  (queryMethod q) handlers of
         Nothing -> return $ Left $ MethodUnknown (queryMethod q)
         Just  m -> m addr q
-  where
-    handlerMap = M.fromList handlers
-    dispatch s = M.lookup s handlerMap
