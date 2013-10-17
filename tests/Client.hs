@@ -4,9 +4,8 @@ module Main (main) where
 import Control.Concurrent
 import Control.Exception
 import qualified Data.ByteString as B
-import Data.BEncode
-import Data.Map
-import System.Environment
+import Data.BEncode as BE
+import Data.BEncode.BDict as BE
 import System.Process
 import System.FilePath
 
@@ -73,7 +72,7 @@ tests =
       BInteger 10 ==? call addr rawM (BInteger 10)
 
   , testCase "raw dict" $
-      let dict = BDict $ fromList
+      let dict = BDict $ BE.fromAscList
                  [ ("some_int", BInteger 100)
                  , ("some_list", BList [BInteger 10])
                  ]
