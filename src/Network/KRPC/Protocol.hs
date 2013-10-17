@@ -64,7 +64,6 @@ import Data.BEncode.Types as BE
 import Data.ByteString as B
 import Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as LB
-import Data.Map as M
 import Data.Typeable
 
 import Network.Socket hiding (recvFrom)

@@ -21,10 +21,8 @@ module Network.KRPC.Scheme
        ) where
 
 import Control.Applicative
-import Data.BEncode as BE
 import Data.BEncode.BDict as BS
 import Data.BEncode.Types as BS
-import Data.Map as M
 import Data.Set as S
 
 import Network.KRPC.Protocol
