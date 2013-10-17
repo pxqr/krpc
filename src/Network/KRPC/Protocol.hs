@@ -17,6 +17,7 @@
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE DefaultSignatures      #-}
+{-# LANGUAGE DeriveDataTypeable     #-}
 module Network.KRPC.Protocol
        ( -- * Error
          KError(..)
@@ -46,9 +47,7 @@ module Network.KRPC.Protocol
 
          -- * Re-exports
        , encode
-       , encoded
        , decode
-       , decoded
        , toBEncode
        , fromBEncode
        ) where
@@ -59,11 +58,14 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
 
-import Data.BEncode
+import Data.BEncode as BE
+import Data.BEncode.BDict as BE
+import Data.BEncode.Types as BE
 import Data.ByteString as B
 import Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as LB
 import Data.Map as M
+import Data.Typeable
 
 import Network.Socket hiding (recvFrom)
 import Network.Socket.ByteString
@@ -89,20 +91,21 @@ data KError
 
     -- | Occur when client trying to call method server don't know.
   | MethodUnknown { errorMessage :: ByteString }
-   deriving (Show, Read, Eq, Ord)
+   deriving (Show, Read, Eq, Ord, Typeable)
 
 instance BEncode KError where
   {-# SPECIALIZE instance BEncode KError #-}
   {-# INLINE toBEncode #-}
-  toBEncode e = fromAscAssocs -- WARN: keep keys sorted
-    [ "e" --> (errorCode e, errorMessage e)
-    , "y" --> ("e" :: ByteString)
-    ]
+  toBEncode e = toDict $
+       "e" .=! (errorCode e, errorMessage e)
+    .: "y" .=! ("e" :: ByteString)
+    .: endDict
 
   {-# INLINE fromBEncode #-}
-  fromBEncode (BDict d)
-    | M.lookup "y" d == Just (BString "e")
-    = uncurry mkKError <$> d >-- "e"
+  fromBEncode be @ (BDict d)
+    | BE.lookup "y" d == Just (BString "e")
+    = (`fromDict` be) $ do
+      uncurry mkKError <$>! "e"
 
   fromBEncode _ = decodingError "KError"
 
@@ -140,31 +143,28 @@ type ParamName  = ByteString
 --
 data KQuery = KQuery {
     queryMethod :: MethodName
-  , queryArgs   :: Map ParamName BValue
-  } deriving (Show, Read, Eq, Ord)
+  , queryArgs   :: BDict
+  } deriving (Show, Read, Eq, Ord, Typeable)
 
 instance BEncode KQuery where
   {-# SPECIALIZE instance BEncode KQuery #-}
   {-# INLINE toBEncode #-}
-  toBEncode (KQuery m args) = fromAscAssocs -- WARN: keep keys sorted
-    [ "a" --> BDict args
-    , "q" --> m
-    , "y" --> ("q" :: ByteString)
-    ]
+  toBEncode (KQuery m args) = toDict $
+       "a" .=! BDict args
+    .: "q" .=! m
+    .: "y" .=! ("q" :: ByteString)
+    .: endDict
 
   {-# INLINE fromBEncode #-}
-  fromBEncode (BDict d)
-    | M.lookup "y" d == Just (BString "q") =
-      KQuery <$> d >-- "q"
-             <*> d >-- "a"
+  fromBEncode bv @ (BDict d)
+    | BE.lookup "y" d == Just (BString "q") = (`fromDict` bv) $ do
+      KQuery <$>! "q" <*>! "a"
 
   fromBEncode _ = decodingError "KQuery"
 
-kquery :: MethodName -> [(ParamName, BValue)] -> KQuery
-kquery name args = KQuery name (M.fromList args)
+kquery :: MethodName -> BDict -> KQuery
+kquery = KQuery
 {-# INLINE kquery #-}
-
-
 
 
 type ValName = ByteString
@@ -179,25 +179,24 @@ type ValName = ByteString
 --   > { "y" : "r", "r" : [<val1>, <val2>, ...] }
 --
 newtype KResponse = KResponse { respVals :: BDict }
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Read, Eq, Ord, Typeable)
 
 instance BEncode KResponse where
   {-# INLINE toBEncode #-}
-  toBEncode (KResponse vals) = fromAscAssocs  -- WARN: keep keys sorted
-    [ "r" --> vals
-    , "y" --> ("r" :: ByteString)
-    ]
+  toBEncode (KResponse vals) = toDict $
+       "r" .=! vals
+    .: "y" .=! ("r" :: ByteString)
+    .: endDict
 
   {-# INLINE fromBEncode #-}
-  fromBEncode (BDict d)
-    | M.lookup "y" d == Just (BString "r") =
-      KResponse <$> d >-- "r"
+  fromBEncode bv @ (BDict d)
+    | BE.lookup "y" d == Just (BString "r") = (`fromDict` bv) $ do
+      KResponse <$>! "r"
 
   fromBEncode _ = decodingError "KDict"
 
-
-kresponse :: [(ValName, BValue)] -> KResponse
-kresponse = KResponse . M.fromList
+kresponse :: BDict -> KResponse
+kresponse = KResponse
 {-# INLINE kresponse #-}
 
 type KRemoteAddr = SockAddr
@@ -219,15 +218,15 @@ maxMsgSize = 64 * 1024 -- bench: max UDP MTU
 {-# INLINE maxMsgSize #-}
 
 sendMessage :: BEncode msg => msg -> KRemoteAddr -> KRemote -> IO ()
-sendMessage msg addr sock = sendManyTo sock (LB.toChunks (encoded msg)) addr
+sendMessage msg addr sock = sendManyTo sock (LB.toChunks (encode msg)) addr
 {-# INLINE sendMessage #-}
 
 recvResponse :: KRemote -> IO (Either KError KResponse)
 recvResponse sock = do
   (raw, _) <- recvFrom sock maxMsgSize
-  return $ case decoded raw of
+  return $ case decode raw of
     Right resp -> Right resp
-    Left decE -> Left $ case decoded raw of
+    Left decE -> Left $ case decode raw of
       Right kerror -> kerror
       _ -> ProtocolError (BC.pack decE)
 
@@ -252,7 +251,7 @@ remoteServer servAddr action = bracket (liftIO bindServ) (liftIO . sClose) loop
         reply <- handleMsg bs addr
         liftIO $ sendMessage reply addr sock
       where
-        handleMsg bs addr = case decoded bs of
+        handleMsg bs addr = case decode bs of
           Right query -> (either toBEncode toBEncode <$> action addr query)
                         `Lifted.catch` (return . toBEncode . serverError)
           Left decodeE   -> return $ toBEncode (ProtocolError (BC.pack decodeE))

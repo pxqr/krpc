@@ -47,7 +47,7 @@ library
 
                      , bytestring   >= 0.10
                      , containers   >= 0.4
-                     , bencoding    == 0.3.*
+                     , bencoding    == 0.4.*
 
                      , network      >= 2.3
   ghc-options:         -Wall

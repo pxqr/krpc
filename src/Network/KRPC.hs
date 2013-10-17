@@ -120,7 +120,9 @@ import Control.Applicative
 import Control.Exception
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Class
-import Data.BEncode
+import Data.BEncode as BE
+import Data.BEncode.BDict as BE
+import Data.BEncode.Types as BE
 import Data.ByteString.Char8 as BC
 import Data.List as L
 import Data.Map  as M
@@ -226,20 +228,24 @@ method = Method
 {-# INLINE method #-}
 
 lookupKey :: ParamName -> BDict -> Result BValue
-lookupKey x = maybe (Left ("not found key " ++ BC.unpack x)) Right . M.lookup x
+lookupKey x = maybe (Left ("not found key " ++ BC.unpack x)) Right . BE.lookup x
 
 extractArgs :: [ParamName] -> BDict -> Result BValue
-extractArgs []  d = Right $ if M.null d then  BList [] else BDict d
+extractArgs []  d = Right $ if BE.null d then  BList [] else BDict d
 extractArgs [x] d = lookupKey x d
 extractArgs xs  d = BList <$> mapM (`lookupKey` d) xs
 {-# INLINE extractArgs #-}
 
-injectVals :: [ParamName] -> BValue -> [(ParamName, BValue)]
-injectVals []  (BList []) = []
-injectVals []  (BDict d ) = M.toList d
+zipBDict :: [BKey] -> [BValue] -> BDict
+zipBDict (k : ks) (v : vs) = Cons k v (zipBDict ks vs)
+zipBDict    _        _     = Nil
+
+injectVals :: [ParamName] -> BValue -> BDict
+injectVals []  (BList []) = BE.empty
+injectVals []  (BDict d ) = d
 injectVals []   be        = invalidParamList [] be
-injectVals [p]  arg       = [(p, arg)]
-injectVals ps  (BList as) = L.zip ps as
+injectVals [p]  arg       = BE.singleton p arg
+injectVals ps  (BList as) = zipBDict ps as
 injectVals ps   be        = invalidParamList ps be
 {-# INLINE injectVals #-}
 
