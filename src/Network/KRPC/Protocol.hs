@@ -44,12 +44,6 @@ module Network.KRPC.Protocol
        , KRemoteAddr
        , withRemote
        , remoteServer
-
-         -- * Re-exports
-       , encode
-       , decode
-       , toBEncode
-       , fromBEncode
        ) where
 
 import Control.Applicative
@@ -80,16 +74,16 @@ import Network.Socket.ByteString
 --
 data KError
     -- | Some error doesn't fit in any other category.
-  = GenericError { errorMessage :: ByteString }
+  = GenericError { errorMessage :: !ByteString }
 
     -- | Occur when server fail to process procedure call.
-  | ServerError  { errorMessage :: ByteString }
+  | ServerError  { errorMessage :: !ByteString }
 
     -- | Malformed packet, invalid arguments or bad token.
-  | ProtocolError { errorMessage :: ByteString }
+  | ProtocolError { errorMessage :: !ByteString }
 
     -- | Occur when client trying to call method server don't know.
-  | MethodUnknown { errorMessage :: ByteString }
+  | MethodUnknown { errorMessage :: !ByteString }
    deriving (Show, Read, Eq, Ord, Typeable)
 
 instance BEncode KError where
@@ -141,7 +135,7 @@ type ParamName  = ByteString
 --    > { "y" : "q", "q" : "<method_name>", "a" : [<arg1>, <arg2>, ...] }
 --
 data KQuery = KQuery {
-    queryMethod :: MethodName
+    queryMethod :: !MethodName
   , queryArgs   :: BDict
   } deriving (Show, Read, Eq, Ord, Typeable)
 
