@@ -8,3 +8,4 @@
 * 0.4.0.0: IPv6 support.
 * 0.4.0.1: Minor documentation fixes.
 * 0.4.1.0: Use bencoding-0.4.*
+* 0.4.1.1: Fixed build failure on GHC == 7.4.*
