@@ -49,6 +49,10 @@ library
                      , bencoding    == 0.4.*
 
                      , network      >= 2.3
+
+  if impl(ghc < 7.6)
+    build-depends:     ghc-prim
+
   ghc-options:         -Wall
 
 
