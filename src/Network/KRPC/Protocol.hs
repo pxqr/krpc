@@ -40,8 +40,6 @@ module Network.KRPC.Protocol
        , recvResponse
 
          -- * Remote
-       , KRemote
-       , KRemoteAddr
        , withRemote
        , remoteServer
        ) where
@@ -101,6 +99,8 @@ instance BEncode KError where
       uncurry mkKError <$>! "e"
 
   fromBEncode _ = decodingError "KError"
+
+instance Exception KError
 
 type ErrorCode = Int
 
@@ -194,29 +194,26 @@ kresponse :: BDict -> KResponse
 kresponse = KResponse
 {-# INLINE kresponse #-}
 
-type KRemoteAddr = SockAddr
-type KRemote = Socket
-
 sockAddrFamily :: SockAddr -> Family
 sockAddrFamily (SockAddrInet  _ _    ) = AF_INET
 sockAddrFamily (SockAddrInet6 _ _ _ _) = AF_INET6
 sockAddrFamily (SockAddrUnix  _      ) = AF_UNIX
 
-withRemote :: (MonadBaseControl IO m, MonadIO m) => (KRemote -> m a) -> m a
+withRemote :: (MonadBaseControl IO m, MonadIO m) => (Socket -> m a) -> m a
 withRemote = bracket (liftIO (socket AF_INET6 Datagram defaultProtocol))
                      (liftIO .  sClose)
-{-# SPECIALIZE withRemote :: (KRemote -> IO a) -> IO a #-}
+{-# SPECIALIZE withRemote :: (Socket -> IO a) -> IO a #-}
 
 maxMsgSize :: Int
 --maxMsgSize = 512 -- release: size of payload of one udp packet
 maxMsgSize = 64 * 1024 -- bench: max UDP MTU
 {-# INLINE maxMsgSize #-}
 
-sendMessage :: BEncode msg => msg -> KRemoteAddr -> KRemote -> IO ()
+sendMessage :: BEncode msg => msg -> SockAddr -> Socket -> IO ()
 sendMessage msg addr sock = sendManyTo sock (LB.toChunks (encode msg)) addr
 {-# INLINE sendMessage #-}
 
-recvResponse :: KRemote -> IO (Either KError KResponse)
+recvResponse :: Socket -> IO (Either KError KResponse)
 recvResponse sock = do
   (raw, _) <- recvFrom sock maxMsgSize
   return $ case decode raw of
@@ -227,9 +224,8 @@ recvResponse sock = do
 
 -- | Run server using a given port. Method invocation should be done manually.
 remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
-             => KRemoteAddr -- ^ Port number to listen.
-             -> (KRemoteAddr -> KQuery -> remote (Either KError KResponse))
-             -- ^ Handler.
+             => SockAddr -- ^ Port number to listen.
+             -> (SockAddr -> KQuery -> remote (Either KError KResponse))
              -> remote ()
 remoteServer servAddr action = bracket (liftIO bindServ) (liftIO . sClose) loop
   where

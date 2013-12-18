@@ -101,8 +101,6 @@ module Network.KRPC
        , idM
 
          -- * Client
-       , RemoteAddr
-       , RPCException(..)
        , call
 
          -- * Server
@@ -128,6 +126,7 @@ import Data.List as L
 import Data.Monoid
 import Data.Typeable
 import Network
+import Network.Socket
 import GHC.Generics
 
 import Network.KRPC.Protocol
@@ -253,46 +252,28 @@ invalidParamList pl be
   = error $ "KRPC invalid parameter list: " ++ show pl ++ "\n" ++
             "while procedure args are: "    ++ show be
 
--- | Alias to Socket, through might change in future.
-type Remote = Socket
-
--- | Represent any error mentioned by protocol specification that
---   'call', 'await' might throw.
---   For more details see 'Remote.KRPC.Protocol'.
---
-data RPCException = RPCException KError
-                  deriving (Show, Eq, Typeable)
-
-instance Exception RPCException
-
--- | Address of remote can be called by client.
-type RemoteAddr = KRemoteAddr
-
-queryCall :: BEncode param
-          => KRemote -> KRemoteAddr
+queryCall :: BEncode param => Socket -> SockAddr
           -> Method param result -> param -> IO ()
 queryCall sock addr m arg = sendMessage q addr sock
   where
     q = kquery (methodName m) (injectVals (methodParams m) (toBEncode arg))
 
-getResult :: BEncode result
-          => KRemote
-          -> Method param result -> IO result
+getResult :: BEncode result => Socket -> Method param result -> IO result
 getResult sock m = do
   resp <- recvResponse sock
   case resp of
-    Left e -> throw (RPCException e)
+    Left e -> throw e
     Right (respVals -> dict) -> do
       case fromBEncode =<< extractArgs (methodVals m) dict of
         Right vals -> return vals
-        Left  e    -> throw (RPCException (ProtocolError (BC.pack e)))
+        Left  e    -> throw (ProtocolError (BC.pack e))
 
 
 -- | Makes remote procedure call. Throws RPCException on any error
 -- occurred.
 call :: (MonadBaseControl IO host, MonadIO host)
      => (BEncode param, BEncode result)
-     => RemoteAddr          -- ^ Address of callee.
+     => SockAddr            -- ^ Address of callee.
      -> Method param result -- ^ Procedure to call.
      -> param               -- ^ Arguments passed by callee to procedure.
      -> host result         -- ^ Values returned by callee from the procedure.
@@ -301,8 +282,8 @@ call addr m arg = liftIO $ withRemote $ \sock -> do call_ sock addr m arg
 -- | The same as 'call' but use already opened socket.
 call_ :: (MonadBaseControl IO host, MonadIO host)
      => (BEncode param, BEncode result)
-     => Remote              -- ^ Socket to use
-     -> RemoteAddr          -- ^ Address of callee.
+     => Socket              -- ^ Socket to use
+     -> SockAddr            -- ^ Address of callee.
      -> Method param result -- ^ Procedure to call.
      -> param               -- ^ Arguments passed by callee to procedure.
      -> host result         -- ^ Values returned by callee from the procedure.
@@ -311,7 +292,7 @@ call_ sock addr m arg = liftIO $ do
   getResult sock m
 
 
-type HandlerBody remote = KRemoteAddr -> KQuery -> remote (Either KError KResponse)
+type HandlerBody remote = SockAddr -> KQuery -> remote (Either KError KResponse)
 
 -- | Procedure signature and implementation binded up.
 type MethodHandler remote = (MethodName, HandlerBody remote)
@@ -333,7 +314,7 @@ infix 1 ==>
            (BEncode param,  BEncode result)
         => Monad remote
         => Method param result      -- ^ Signature.
-        -> (KRemoteAddr -> param -> remote result) -- ^ Implementation.
+        -> (SockAddr -> param -> remote result) -- ^ Implementation.
         -> MethodHandler remote     -- ^ Handler used by server.
 {-# INLINE (==>@) #-}
 m ==>@ body = (methodName m, newbody)
@@ -353,7 +334,7 @@ infix 1 ==>@
 --   it will not create new thread for each connection.
 --
 server :: (MonadBaseControl IO remote, MonadIO remote)
-       => KRemoteAddr             -- ^ Port used to accept incoming connections.
+       => SockAddr             -- ^ Port used to accept incoming connections.
        -> [MethodHandler remote]  -- ^ Method table.
        -> remote ()
 server servAddr handlers = do

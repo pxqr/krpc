@@ -18,7 +18,7 @@ import Network.Socket
 import Shared
 
 
-addr :: RemoteAddr
+addr :: SockAddr
 addr = SockAddrInet 6000 0
 
 withServ :: FilePath -> IO () -> IO ()
