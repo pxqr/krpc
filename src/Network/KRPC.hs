@@ -334,7 +334,7 @@ infix 1 ==>@
 --   it will not create new thread for each connection.
 --
 server :: (MonadBaseControl IO remote, MonadIO remote)
-       => SockAddr             -- ^ Port used to accept incoming connections.
+       => SockAddr                -- ^ Port used to accept incoming connections.
        -> [MethodHandler remote]  -- ^ Method table.
        -> remote ()
 server servAddr handlers = do

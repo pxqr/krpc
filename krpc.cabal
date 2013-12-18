@@ -38,7 +38,6 @@ library
   hs-source-dirs:      src
   exposed-modules:     Network.KRPC
                      , Network.KRPC.Protocol
-                     , Network.KRPC.Scheme
   build-depends:       base          == 4.*
                      , bytestring   >= 0.10
 
