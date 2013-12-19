@@ -208,7 +208,7 @@ call :: forall req resp host.
         (MonadBaseControl IO host, MonadIO host, KRPC req resp)
      => SockAddr -> req -> host resp
 call addr arg = liftIO $ withRemote $ \sock -> do
-     sendMessage (KQuery name (toBEncode arg)) addr sock
+     sendMessage (KQuery (toBEncode arg) name undefined) addr sock
      getResult sock
   where
     Method name = method :: Method req resp
@@ -231,12 +231,12 @@ handler body = (name, newbody)
     Method name = method :: Method req resp
 
     {-# INLINE newbody #-}
-    newbody addr q =
-      case fromBEncode (queryArgs q) of
+    newbody addr KQuery {..} =
+      case fromBEncode queryArgs of
         Left  e -> return (Left (ProtocolError (BC.pack e)))
         Right a -> do
           r <- body addr a
-          return (Right (KResponse (toBEncode r)))
+          return (Right (KResponse (toBEncode r) queryId))
 
 sockAddrFamily :: SockAddr -> Family
 sockAddrFamily (SockAddrInet  _ _    ) = AF_INET

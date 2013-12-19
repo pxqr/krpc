@@ -100,6 +100,8 @@ serverError = ServerError . BC.pack . show
 
 type MethodName = ByteString
 
+type TransactionId = ByteString
+
 -- | Query used to signal that caller want to make procedure call to
 -- callee and pass arguments in. Therefore query may be only sent from
 -- client to server but not in the opposite direction.
@@ -109,27 +111,24 @@ type MethodName = ByteString
 --    > { "y" : "q", "q" : "<method_name>", "a" : [<arg1>, <arg2>, ...] }
 --
 data KQuery = KQuery
-  { queryMethod :: !MethodName
-  , queryArgs   :: !BValue
+  { queryArgs   :: !BValue
+  , queryMethod :: !MethodName
+  , queryId     :: !TransactionId
   } deriving (Show, Read, Eq, Ord, Typeable)
 
 instance BEncode KQuery where
-  {-# SPECIALIZE instance BEncode KQuery #-}
-  {-# INLINE toBEncode #-}
-  toBEncode (KQuery m args) = toDict $
-       "a" .=! args
-    .: "q" .=! m
+  toBEncode KQuery {..} = toDict $
+       "a" .=! queryArgs
+    .: "q" .=! queryMethod
+    .: "t" .=! queryId
     .: "y" .=! ("q" :: ByteString)
     .: endDict
+  {-# INLINE toBEncode #-}
 
+  fromBEncode = fromDict $ do
+    lookAhead $ match "y" (BString "q")
+    KQuery <$>! "a" <*>! "q" <*>! "t"
   {-# INLINE fromBEncode #-}
-  fromBEncode bv @ (BDict d)
-    | BE.lookup "y" d == Just (BString "q") = (`fromDict` bv) $ do
-      a <- field (req "a")
-      q <- field (req "q")
-      return $! KQuery q a
-
-  fromBEncode _ = decodingError "KQuery"
 
 -- | KResponse used to signal that callee successufully process a
 -- procedure call and to return values from procedure. KResponse should
@@ -140,20 +139,20 @@ instance BEncode KQuery where
 --
 --   > { "y" : "r", "r" : [<val1>, <val2>, ...] }
 --
-newtype KResponse = KResponse
+data KResponse = KResponse
   { respVals :: BValue
+  , respId   :: TransactionId
   } deriving (Show, Read, Eq, Ord, Typeable)
 
 instance BEncode KResponse where
-  {-# INLINE toBEncode #-}
-  toBEncode (KResponse vals) = toDict $
-       "r" .=! vals
+  toBEncode KResponse {..} = toDict $
+       "r" .=! respVals
+    .: "t" .=! respId
     .: "y" .=! ("r" :: ByteString)
     .: endDict
+  {-# INLINE toBEncode #-}
 
+  fromBEncode = fromDict $ do
+    lookAhead $ match "y" (BString "r")
+    KResponse <$>! "r" <*>! "t"
   {-# INLINE fromBEncode #-}
-  fromBEncode bv @ (BDict d)
-    | BE.lookup "y" d == Just (BString "r") = (`fromDict` bv) $ do
-      KResponse <$>! "r"
-
-  fromBEncode _ = decodingError "KDict"

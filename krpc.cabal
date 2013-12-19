@@ -40,13 +40,10 @@ library
                      , Network.KRPC.Message
   build-depends:       base          == 4.*
                      , bytestring   >= 0.10
-
                      , lifted-base   >= 0.1.1
                      , transformers  >= 0.2
                      , monad-control >= 0.3
-
-                     , bencoding    == 0.4.*
-
+                     , bencoding    >= 0.4.3
                      , network      >= 2.3
 
   if impl(ghc < 7.6)
