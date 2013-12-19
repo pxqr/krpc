@@ -114,17 +114,21 @@ module Network.KRPC
        , server
        ) where
 
-import Control.Exception
+import Control.Applicative
+import Control.Exception.Lifted as Lifted
+import Control.Monad
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Class
 import Data.BEncode as BE
 import Data.ByteString.Char8 as BC
+import Data.ByteString.Lazy as BL
 import Data.List as L
 import Data.Monoid
 import Data.String
 import Data.Typeable
 import Network
 import Network.Socket
+import Network.Socket.ByteString as BS
 
 import Network.KRPC.Protocol
 
@@ -166,6 +170,32 @@ showsMethod (Method name) =
     paramsTy = typeOf (impossible :: a)
     valuesTy = typeOf (impossible :: b)
 
+{-----------------------------------------------------------------------
+--  Client
+-----------------------------------------------------------------------}
+
+sendMessage :: BEncode msg => msg -> SockAddr -> Socket -> IO ()
+sendMessage msg addr sock = sendManyTo sock (BL.toChunks (encode msg)) addr
+{-# INLINE sendMessage #-}
+
+maxMsgSize :: Int
+--maxMsgSize = 512 -- release: size of payload of one udp packet
+maxMsgSize = 64 * 1024 -- bench: max UDP MTU
+{-# INLINE maxMsgSize #-}
+
+recvResponse :: Socket -> IO (Either KError KResponse)
+recvResponse sock = do
+  (raw, _) <- BS.recvFrom sock maxMsgSize
+  return $ case decode raw of
+    Right resp -> Right resp
+    Left decE -> Left $ case decode raw of
+      Right kerror -> kerror
+      _ -> ProtocolError (BC.pack decE)
+
+withRemote :: (MonadBaseControl IO m, MonadIO m) => (Socket -> m a) -> m a
+withRemote = bracket (liftIO (socket AF_INET6 Datagram defaultProtocol))
+                     (liftIO .  sClose)
+{-# SPECIALIZE withRemote :: (Socket -> IO a) -> IO a #-}
 
 getResult :: BEncode result => Socket -> IO result
 getResult sock = do
@@ -182,6 +212,10 @@ call addr arg = liftIO $ withRemote $ \sock -> do
      getResult sock
   where
     Method name = method :: Method req resp
+
+{-----------------------------------------------------------------------
+--  Server
+-----------------------------------------------------------------------}
 
 type HandlerBody remote = SockAddr -> KQuery -> remote (Either KError KResponse)
 
@@ -203,6 +237,36 @@ handler body = (name, newbody)
         Right a -> do
           r <- body addr a
           return (Right (KResponse (toBEncode r)))
+
+sockAddrFamily :: SockAddr -> Family
+sockAddrFamily (SockAddrInet  _ _    ) = AF_INET
+sockAddrFamily (SockAddrInet6 _ _ _ _) = AF_INET6
+sockAddrFamily (SockAddrUnix  _      ) = AF_UNIX
+
+-- | Run server using a given port. Method invocation should be done manually.
+remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
+             => SockAddr -- ^ Port number to listen.
+             -> (SockAddr -> KQuery -> remote (Either KError KResponse))
+             -> remote ()
+remoteServer servAddr action = bracket (liftIO bindServ) (liftIO . sClose) loop
+  where
+    bindServ = do
+        let family = sockAddrFamily servAddr
+        sock <- socket family Datagram defaultProtocol
+        when (family == AF_INET6) $ do
+          setSocketOption sock IPv6Only 0
+        bindSocket sock servAddr
+        return sock
+
+    loop sock = forever $ do
+        (bs, addr) <- liftIO $ BS.recvFrom sock maxMsgSize
+        reply <- handleMsg bs addr
+        liftIO $ sendMessage reply addr sock
+      where
+        handleMsg bs addr = case decode bs of
+          Right query -> (either toBEncode toBEncode <$> action addr query)
+                        `Lifted.catch` (return . toBEncode . serverError)
+          Left decodeE   -> return $ toBEncode (ProtocolError (BC.pack decodeE))
 
 -- | Run RPC server on specified port by using list of handlers.
 --   Server will dispatch procedure specified by callee, but note that

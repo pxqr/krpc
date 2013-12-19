@@ -21,44 +21,22 @@
 module Network.KRPC.Protocol
        ( -- * Error
          KError(..)
-       , ErrorCode
-       , errorCode
-       , mkKError
+       , serverError
 
          -- * Query
        , KQuery(..)
        , MethodName
-       , ParamName
 
          -- * Response
        , KResponse(..)
-       , ValName
-
-       , sendMessage
-       , recvResponse
-
-         -- * Remote
-       , withRemote
-       , remoteServer
        ) where
 
-import Control.Applicative
 import Control.Exception.Lifted as Lifted
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Control
-
 import Data.BEncode as BE
 import Data.BEncode.BDict as BE
-import Data.BEncode.Types as BE
 import Data.ByteString as B
 import Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as LB
 import Data.Typeable
-
-import Network.Socket hiding (recvFrom)
-import Network.Socket.ByteString
-
 
 -- | Errors used to signal that some error occurred while processing a
 -- procedure call. Error may be send only from server to client but
@@ -120,9 +98,7 @@ mkKError _   = GenericError
 serverError :: SomeException -> KError
 serverError = ServerError . BC.pack . show
 
-
 type MethodName = ByteString
-type ParamName  = ByteString
 
 -- | Query used to signal that caller want to make procedure call to
 -- callee and pass arguments in. Therefore query may be only sent from
@@ -155,8 +131,6 @@ instance BEncode KQuery where
 
   fromBEncode _ = decodingError "KQuery"
 
-type ValName = ByteString
-
 -- | KResponse used to signal that callee successufully process a
 -- procedure call and to return values from procedure. KResponse should
 -- not be sent if error occurred during RPC. Thus KResponse may be only
@@ -183,56 +157,3 @@ instance BEncode KResponse where
       KResponse <$>! "r"
 
   fromBEncode _ = decodingError "KDict"
-
-sockAddrFamily :: SockAddr -> Family
-sockAddrFamily (SockAddrInet  _ _    ) = AF_INET
-sockAddrFamily (SockAddrInet6 _ _ _ _) = AF_INET6
-sockAddrFamily (SockAddrUnix  _      ) = AF_UNIX
-
-withRemote :: (MonadBaseControl IO m, MonadIO m) => (Socket -> m a) -> m a
-withRemote = bracket (liftIO (socket AF_INET6 Datagram defaultProtocol))
-                     (liftIO .  sClose)
-{-# SPECIALIZE withRemote :: (Socket -> IO a) -> IO a #-}
-
-maxMsgSize :: Int
---maxMsgSize = 512 -- release: size of payload of one udp packet
-maxMsgSize = 64 * 1024 -- bench: max UDP MTU
-{-# INLINE maxMsgSize #-}
-
-sendMessage :: BEncode msg => msg -> SockAddr -> Socket -> IO ()
-sendMessage msg addr sock = sendManyTo sock (LB.toChunks (encode msg)) addr
-{-# INLINE sendMessage #-}
-
-recvResponse :: Socket -> IO (Either KError KResponse)
-recvResponse sock = do
-  (raw, _) <- recvFrom sock maxMsgSize
-  return $ case decode raw of
-    Right resp -> Right resp
-    Left decE -> Left $ case decode raw of
-      Right kerror -> kerror
-      _ -> ProtocolError (BC.pack decE)
-
--- | Run server using a given port. Method invocation should be done manually.
-remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
-             => SockAddr -- ^ Port number to listen.
-             -> (SockAddr -> KQuery -> remote (Either KError KResponse))
-             -> remote ()
-remoteServer servAddr action = bracket (liftIO bindServ) (liftIO . sClose) loop
-  where
-    bindServ = do
-        let family = sockAddrFamily servAddr
-        sock <- socket family Datagram defaultProtocol
-        when (family == AF_INET6) $ do
-          setSocketOption sock IPv6Only 0
-        bindSocket sock servAddr
-        return sock
-
-    loop sock = forever $ do
-        (bs, addr) <- liftIO $ recvFrom sock maxMsgSize
-        reply <- handleMsg bs addr
-        liftIO $ sendMessage reply addr sock
-      where
-        handleMsg bs addr = case decode bs of
-          Right query -> (either toBEncode toBEncode <$> action addr query)
-                        `Lifted.catch` (return . toBEncode . serverError)
-          Left decodeE   -> return $ toBEncode (ProtocolError (BC.pack decodeE))
