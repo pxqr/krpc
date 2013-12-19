@@ -2,14 +2,17 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE DefaultSignatures          #-}
 module Network.KRPC.Method
        ( Method (..)
        , KRPC (..)
        ) where
 
 import Data.BEncode (BEncode)
+import Data.Char
 import Data.Monoid
+import Data.List as L
 import Data.String
 import Data.Typeable
 import Network.KRPC.Message
@@ -59,3 +62,8 @@ showsMethod (Method name) =
 --   @
 class (BEncode req, BEncode resp) => KRPC req resp | req -> resp where
   method :: Method req resp
+
+  default method :: Typeable req => Method req resp
+  method = Method $ fromString $ L.map toLower $ show $ typeOf hole
+    where
+      hole = error "krpc.method: impossible" :: req
