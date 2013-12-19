@@ -190,7 +190,7 @@ recvResponse sock = do
     Right resp -> Right resp
     Left decE -> Left $ case decode raw of
       Right kerror -> kerror
-      _ -> ProtocolError (BC.pack decE)
+      _ -> KError ProtocolError (BC.pack decE) undefined
 
 withRemote :: (MonadBaseControl IO m, MonadIO m) => (Socket -> m a) -> m a
 withRemote = bracket (liftIO (socket AF_INET6 Datagram defaultProtocol))
@@ -199,8 +199,10 @@ withRemote = bracket (liftIO (socket AF_INET6 Datagram defaultProtocol))
 
 getResult :: BEncode result => Socket -> IO result
 getResult sock = do
-  resp <- either throw (return . respVals) =<< recvResponse sock
-  either (throw . ProtocolError . BC.pack) return $ fromBEncode resp
+  KResponse {..} <- either throw return =<< recvResponse sock
+  case fromBEncode respVals of
+    Left msg -> throw $ KError ProtocolError (BC.pack msg) respId
+    Right r  -> return r
 
 -- | Makes remote procedure call. Throws RPCException on any error
 -- occurred.
@@ -233,10 +235,10 @@ handler body = (name, newbody)
     {-# INLINE newbody #-}
     newbody addr KQuery {..} =
       case fromBEncode queryArgs of
-        Left  e -> return (Left (ProtocolError (BC.pack e)))
+        Left  e -> return $ Left $ KError ProtocolError (BC.pack e) queryId
         Right a -> do
           r <- body addr a
-          return (Right (KResponse (toBEncode r) queryId))
+          return $ Right $ KResponse (toBEncode r) queryId
 
 sockAddrFamily :: SockAddr -> Family
 sockAddrFamily (SockAddrInet  _ _    ) = AF_INET
@@ -265,8 +267,9 @@ remoteServer servAddr action = bracket (liftIO bindServ) (liftIO . sClose) loop
       where
         handleMsg bs addr = case decode bs of
           Right query -> (either toBEncode toBEncode <$> action addr query)
-                        `Lifted.catch` (return . toBEncode . serverError)
-          Left decodeE   -> return $ toBEncode (ProtocolError (BC.pack decodeE))
+              `Lifted.catch` (return . toBEncode . (`serverError` undefined ))
+          Left decodeE   -> return $ toBEncode $
+             KError ProtocolError (BC.pack decodeE) undefined
 
 -- | Run RPC server on specified port by using list of handlers.
 --   Server will dispatch procedure specified by callee, but note that
@@ -277,7 +280,7 @@ server :: (MonadBaseControl IO remote, MonadIO remote)
        -> [MethodHandler remote]  -- ^ Method table.
        -> remote ()
 server servAddr handlers = do
-    remoteServer servAddr $ \addr q -> do
-      case L.lookup  (queryMethod q) handlers of
-        Nothing -> return $ Left $ MethodUnknown (queryMethod q)
-        Just  m -> m addr q
+  remoteServer servAddr $ \addr q @ KQuery {..} -> do
+    case L.lookup  queryMethod handlers of
+      Nothing -> return $ Left $ KError MethodUnknown queryMethod queryId
+      Just  m -> m addr q
