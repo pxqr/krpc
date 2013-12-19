@@ -130,7 +130,7 @@ import Network
 import Network.Socket
 import Network.Socket.ByteString as BS
 
-import Network.KRPC.Protocol
+import Network.KRPC.Message
 
 
 class (BEncode req, BEncode resp) => KRPC req resp | req -> resp where

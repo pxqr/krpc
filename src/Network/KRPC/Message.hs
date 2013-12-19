@@ -18,7 +18,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE DefaultSignatures      #-}
 {-# LANGUAGE DeriveDataTypeable     #-}
-module Network.KRPC.Protocol
+module Network.KRPC.Message
        ( -- * Error
          KError(..)
        , serverError

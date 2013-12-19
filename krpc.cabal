@@ -37,7 +37,7 @@ library
                      , RecordWildCards
   hs-source-dirs:      src
   exposed-modules:     Network.KRPC
-                     , Network.KRPC.Protocol
+                     , Network.KRPC.Message
   build-depends:       base          == 4.*
                      , bytestring   >= 0.10
 
