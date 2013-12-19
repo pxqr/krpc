@@ -26,15 +26,13 @@ module Network.KRPC.Protocol
        , mkKError
 
          -- * Query
-       , KQuery(queryMethod, queryArgs)
+       , KQuery(..)
        , MethodName
        , ParamName
-       , kquery
 
          -- * Response
-       , KResponse(respVals)
+       , KResponse(..)
        , ValName
-       , kresponse
 
        , sendMessage
        , recvResponse
@@ -134,16 +132,16 @@ type ParamName  = ByteString
 --
 --    > { "y" : "q", "q" : "<method_name>", "a" : [<arg1>, <arg2>, ...] }
 --
-data KQuery = KQuery {
-    queryMethod :: !MethodName
-  , queryArgs   :: BDict
+data KQuery = KQuery
+  { queryMethod :: !MethodName
+  , queryArgs   :: !BValue
   } deriving (Show, Read, Eq, Ord, Typeable)
 
 instance BEncode KQuery where
   {-# SPECIALIZE instance BEncode KQuery #-}
   {-# INLINE toBEncode #-}
   toBEncode (KQuery m args) = toDict $
-       "a" .=! BDict args
+       "a" .=! args
     .: "q" .=! m
     .: "y" .=! ("q" :: ByteString)
     .: endDict
@@ -157,11 +155,6 @@ instance BEncode KQuery where
 
   fromBEncode _ = decodingError "KQuery"
 
-kquery :: MethodName -> BDict -> KQuery
-kquery = KQuery
-{-# INLINE kquery #-}
-
-
 type ValName = ByteString
 
 -- | KResponse used to signal that callee successufully process a
@@ -173,8 +166,9 @@ type ValName = ByteString
 --
 --   > { "y" : "r", "r" : [<val1>, <val2>, ...] }
 --
-newtype KResponse = KResponse { respVals :: BDict }
-  deriving (Show, Read, Eq, Ord, Typeable)
+newtype KResponse = KResponse
+  { respVals :: BValue
+  } deriving (Show, Read, Eq, Ord, Typeable)
 
 instance BEncode KResponse where
   {-# INLINE toBEncode #-}
@@ -189,10 +183,6 @@ instance BEncode KResponse where
       KResponse <$>! "r"
 
   fromBEncode _ = decodingError "KDict"
-
-kresponse :: BDict -> KResponse
-kresponse = KResponse
-{-# INLINE kresponse #-}
 
 sockAddrFamily :: SockAddr -> Family
 sockAddrFamily (SockAddrInet  _ _    ) = AF_INET

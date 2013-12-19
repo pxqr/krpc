@@ -93,44 +93,44 @@
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Network.KRPC
-       ( -- * Method
-         Method(..)
-       , method
-       , idM
+       ( KRPC (..)
+
+         -- * Exception
+       , KError (..)
+
+         -- * Method
+       , Method(..)
 
          -- * Client
        , call
 
          -- * Server
        , MethodHandler
-       , (==>)
-       , (==>@)
+       , handler
        , server
-
-         -- * Internal
-       , call_
-       , withRemote
        ) where
 
-import Control.Applicative
 import Control.Exception
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Class
 import Data.BEncode as BE
-import Data.BEncode.BDict as BE
-import Data.BEncode.Types as BE
 import Data.ByteString.Char8 as BC
 import Data.List as L
 import Data.Monoid
+import Data.String
 import Data.Typeable
 import Network
 import Network.Socket
-import GHC.Generics
 
 import Network.KRPC.Protocol
 
+
+class (BEncode req, BEncode resp) => KRPC req resp | req -> resp where
+  method :: Method req resp
 
 -- | Method datatype used to describe name, parameters and return
 --   values of procedure. Client use a method to /invoke/, server
@@ -147,187 +147,62 @@ import Network.KRPC.Protocol
 --     exsample @Method (Foo, Bar) (Bar, Foo)@ will take two arguments
 --     and return two values.
 --
---  To pass raw dictionaries you should specify empty param list:
---
---    > method "my_method" [] [] :: Method BEncode BEncode
---
---  In this case you should handle dictionary extraction by hand, both
---  in client and server.
---
-data Method param result = Method {
-    -- | Name used in query.
-    methodName   :: MethodName
-
-    -- | Name of each parameter in /right to left/ order.
-  , methodParams :: [ParamName]
-
-    -- | Name of each return value in /right to left/ order.
-  , methodVals   :: [ValName]
-  } deriving (Eq, Ord, Generic)
-
-instance BEncode (Method a b)
+newtype Method param result = Method MethodName
+  deriving (Eq, Ord, IsString, BEncode)
 
 instance (Typeable a, Typeable b) => Show (Method a b) where
   showsPrec _ = showsMethod
 
-showsMethod
-  :: forall a. forall b.
-     Typeable a => Typeable b
-  => Method a b -> ShowS
-showsMethod Method {..} =
-    showString (BC.unpack methodName) <>
+showsMethod :: forall a. forall b. Typeable a => Typeable b
+            => Method a b -> ShowS
+showsMethod (Method name) =
+    shows name <>
     showString " :: " <>
-    showsTuple methodParams paramsTy <>
+    shows paramsTy <>
     showString " -> " <>
-    showsTuple methodVals valuesTy
+    shows valuesTy
   where
-    paramsTy = typeOf (error "KRPC.showsMethod: impossible" :: a)
-    valuesTy = typeOf (error "KRPC.showsMethod: impossible" :: b)
-
-    showsTuple ns ty
-      = showChar '('
-     <> mconcat (L.intersperse (showString ", ") $
-                                L.zipWith showsTyArgName ns (detuple ty))
-     <> showChar ')'
-
-    showsTyArgName ns ty
-      = showString (BC.unpack ns)
-     <> showString " :: "
-     <> showString (show ty)
-
-    detuple tyRep
-        | L.null args = [tyRep]
-        |  otherwise  = args
-      where
-        args = typeRepArgs tyRep
+    impossible = error "KRPC.showsMethod: impossible"
+    paramsTy = typeOf (impossible :: a)
+    valuesTy = typeOf (impossible :: b)
 
 
--- | Identity procedure signature. Could be used for echo
--- servers. Implemented as:
---
---   > idM = method "id" ["x"] ["y"]
---
-idM :: Method a a
-idM = method "id" ["x"] ["y"]
-{-# INLINE idM #-}
-
--- | Makes method signature. Note that order of parameters and return
---   values are not important as long as corresponding names and types
---   are match. For exsample this is the equal definitions:
---
---   > methodA : Method (Foo, Bar) (Baz, Quux)
---   > methodA = method "mymethod" ["a", "b"] ["c", "d"]
---
---   > methodA : Method (Bar, Foo) (Quux, Baz)
---   > methodB = method "mymethod" ["b", "a"] ["d", "c"]
---
-method :: MethodName -> [ParamName] -> [ValName] -> Method param result
-method = Method
-{-# INLINE method #-}
-
-lookupKey :: ParamName -> BDict -> Result BValue
-lookupKey x = maybe (Left ("not found key " ++ BC.unpack x)) Right . BE.lookup x
-
-extractArgs :: [ParamName] -> BDict -> Result BValue
-extractArgs []  d = Right $ if BE.null d then  BList [] else BDict d
-extractArgs [x] d = lookupKey x d
-extractArgs xs  d = BList <$> mapM (`lookupKey` d) xs
-{-# INLINE extractArgs #-}
-
-zipBDict :: [BKey] -> [BValue] -> BDict
-zipBDict (k : ks) (v : vs) = Cons k v (zipBDict ks vs)
-zipBDict    _        _     = Nil
-
-injectVals :: [ParamName] -> BValue -> BDict
-injectVals []  (BList []) = BE.empty
-injectVals []  (BDict d ) = d
-injectVals []   be        = invalidParamList [] be
-injectVals [p]  arg       = BE.singleton p arg
-injectVals ps  (BList as) = zipBDict ps as
-injectVals ps   be        = invalidParamList ps be
-{-# INLINE injectVals #-}
-
-invalidParamList :: [ParamName] -> BValue -> a
-invalidParamList pl be
-  = error $ "KRPC invalid parameter list: " ++ show pl ++ "\n" ++
-            "while procedure args are: "    ++ show be
-
-queryCall :: BEncode param => Socket -> SockAddr
-          -> Method param result -> param -> IO ()
-queryCall sock addr m arg = sendMessage q addr sock
-  where
-    q = kquery (methodName m) (injectVals (methodParams m) (toBEncode arg))
-
-getResult :: BEncode result => Socket -> Method param result -> IO result
-getResult sock m = do
-  resp <- recvResponse sock
-  case resp of
-    Left e -> throw e
-    Right (respVals -> dict) -> do
-      case fromBEncode =<< extractArgs (methodVals m) dict of
-        Right vals -> return vals
-        Left  e    -> throw (ProtocolError (BC.pack e))
-
+getResult :: BEncode result => Socket -> IO result
+getResult sock = do
+  resp <- either throw (return . respVals) =<< recvResponse sock
+  either (throw . ProtocolError . BC.pack) return $ fromBEncode resp
 
 -- | Makes remote procedure call. Throws RPCException on any error
 -- occurred.
-call :: (MonadBaseControl IO host, MonadIO host)
-     => (BEncode param, BEncode result)
-     => SockAddr            -- ^ Address of callee.
-     -> Method param result -- ^ Procedure to call.
-     -> param               -- ^ Arguments passed by callee to procedure.
-     -> host result         -- ^ Values returned by callee from the procedure.
-call addr m arg = liftIO $ withRemote $ \sock -> do call_ sock addr m arg
-
--- | The same as 'call' but use already opened socket.
-call_ :: (MonadBaseControl IO host, MonadIO host)
-     => (BEncode param, BEncode result)
-     => Socket              -- ^ Socket to use
-     -> SockAddr            -- ^ Address of callee.
-     -> Method param result -- ^ Procedure to call.
-     -> param               -- ^ Arguments passed by callee to procedure.
-     -> host result         -- ^ Values returned by callee from the procedure.
-call_ sock addr m arg = liftIO $ do
-  queryCall sock addr m arg
-  getResult sock m
-
+call :: forall req resp host.
+        (MonadBaseControl IO host, MonadIO host, KRPC req resp)
+     => SockAddr -> req -> host resp
+call addr arg = liftIO $ withRemote $ \sock -> do
+     sendMessage (KQuery name (toBEncode arg)) addr sock
+     getResult sock
+  where
+    Method name = method :: Method req resp
 
 type HandlerBody remote = SockAddr -> KQuery -> remote (Either KError KResponse)
 
 -- | Procedure signature and implementation binded up.
 type MethodHandler remote = (MethodName, HandlerBody remote)
 
--- we can safely erase types in (==>)
--- | Assign method implementation to the method signature.
-(==>) :: forall (remote :: * -> *) (param :: *) (result :: *).
-           (BEncode param,  BEncode result)
-        => Monad remote
-        => Method param result      -- ^ Signature.
-        -> (param -> remote result) -- ^ Implementation.
-        -> MethodHandler remote     -- ^ Handler used by server.
-{-# INLINE (==>) #-}
-m ==> body = m ==>@ const body
-infix 1 ==>
-
 -- | Similar to '==>@' but additionally pass caller address.
-(==>@)  :: forall (remote :: * -> *) (param :: *) (result :: *).
-           (BEncode param,  BEncode result)
-        => Monad remote
-        => Method param result      -- ^ Signature.
-        -> (SockAddr -> param -> remote result) -- ^ Implementation.
-        -> MethodHandler remote     -- ^ Handler used by server.
-{-# INLINE (==>@) #-}
-m ==>@ body = (methodName m, newbody)
+handler  :: forall (remote :: * -> *) (req :: *) (resp :: *).
+           (KRPC req resp, Monad remote)
+        => (SockAddr -> req -> remote resp) -> MethodHandler remote
+handler body = (name, newbody)
   where
+    Method name = method :: Method req resp
+
     {-# INLINE newbody #-}
     newbody addr q =
-      case fromBEncode =<< extractArgs (methodParams m) (queryArgs q) of
+      case fromBEncode (queryArgs q) of
         Left  e -> return (Left (ProtocolError (BC.pack e)))
         Right a -> do
           r <- body addr a
-          return (Right (kresponse (injectVals (methodVals m) (toBEncode r))))
-
-infix 1 ==>@
+          return (Right (KResponse (toBEncode r)))
 
 -- | Run RPC server on specified port by using list of handlers.
 --   Server will dispatch procedure specified by callee, but note that
