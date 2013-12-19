@@ -97,190 +97,23 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FunctionalDependencies #-}
 module Network.KRPC
-       ( KRPC (..)
+       ( -- * Methods
+         Method
+       , KRPC (..)
 
-         -- * Exception
-       , KError (..)
-
-         -- * Method
-       , Method(..)
-
-         -- * Client
-       , call
-
-         -- * Server
-       , MethodHandler
+         -- * RPC
        , handler
-       , server
+       , query
+
+         -- * Manager
+       , MonadKRPC (..)
+       , newManager
+--       , closeManager
+
+         -- * Exceptions
+       , KError (..)
        ) where
 
-import Control.Applicative
-import Control.Exception.Lifted as Lifted
-import Control.Monad
-import Control.Monad.Trans.Control
-import Control.Monad.IO.Class
-import Data.BEncode as BE
-import Data.ByteString.Char8 as BC
-import Data.ByteString.Lazy as BL
-import Data.List as L
-import Data.Monoid
-import Data.String
-import Data.Typeable
-import Network
-import Network.Socket
-import Network.Socket.ByteString as BS
-
 import Network.KRPC.Message
-
-
-class (BEncode req, BEncode resp) => KRPC req resp | req -> resp where
-  method :: Method req resp
-
--- | Method datatype used to describe name, parameters and return
---   values of procedure. Client use a method to /invoke/, server
---   /implements/ the method to make the actual work.
---
---   We use the following fantom types to ensure type-safiety:
---
---     * param: Type of method parameters. Ordinary Tuple type used
---     to specify more than one parameter, so for example @Method
---     (Int, Int) result@ will take two arguments.
---
---     * result: Type of return value of the method. Similarly,
---     tuple used to specify more than one return value, so for
---     exsample @Method (Foo, Bar) (Bar, Foo)@ will take two arguments
---     and return two values.
---
-newtype Method param result = Method MethodName
-  deriving (Eq, Ord, IsString, BEncode)
-
-instance (Typeable a, Typeable b) => Show (Method a b) where
-  showsPrec _ = showsMethod
-
-showsMethod :: forall a. forall b. Typeable a => Typeable b
-            => Method a b -> ShowS
-showsMethod (Method name) =
-    shows name <>
-    showString " :: " <>
-    shows paramsTy <>
-    showString " -> " <>
-    shows valuesTy
-  where
-    impossible = error "KRPC.showsMethod: impossible"
-    paramsTy = typeOf (impossible :: a)
-    valuesTy = typeOf (impossible :: b)
-
-{-----------------------------------------------------------------------
---  Client
------------------------------------------------------------------------}
-
-sendMessage :: BEncode msg => msg -> SockAddr -> Socket -> IO ()
-sendMessage msg addr sock = sendManyTo sock (BL.toChunks (encode msg)) addr
-{-# INLINE sendMessage #-}
-
-maxMsgSize :: Int
---maxMsgSize = 512 -- release: size of payload of one udp packet
-maxMsgSize = 64 * 1024 -- bench: max UDP MTU
-{-# INLINE maxMsgSize #-}
-
-recvResponse :: Socket -> IO (Either KError KResponse)
-recvResponse sock = do
-  (raw, _) <- BS.recvFrom sock maxMsgSize
-  return $ case decode raw of
-    Right resp -> Right resp
-    Left decE -> Left $ case decode raw of
-      Right kerror -> kerror
-      _ -> KError ProtocolError (BC.pack decE) undefined
-
-withRemote :: (MonadBaseControl IO m, MonadIO m) => (Socket -> m a) -> m a
-withRemote = bracket (liftIO (socket AF_INET6 Datagram defaultProtocol))
-                     (liftIO .  sClose)
-{-# SPECIALIZE withRemote :: (Socket -> IO a) -> IO a #-}
-
-getResult :: BEncode result => Socket -> IO result
-getResult sock = do
-  KResponse {..} <- either throw return =<< recvResponse sock
-  case fromBEncode respVals of
-    Left msg -> throw $ KError ProtocolError (BC.pack msg) respId
-    Right r  -> return r
-
--- | Makes remote procedure call. Throws RPCException on any error
--- occurred.
-call :: forall req resp host.
-        (MonadBaseControl IO host, MonadIO host, KRPC req resp)
-     => SockAddr -> req -> host resp
-call addr arg = liftIO $ withRemote $ \sock -> do
-     sendMessage (KQuery (toBEncode arg) name undefined) addr sock
-     getResult sock
-  where
-    Method name = method :: Method req resp
-
-{-----------------------------------------------------------------------
---  Server
------------------------------------------------------------------------}
-
-type HandlerBody remote = SockAddr -> KQuery -> remote (Either KError KResponse)
-
--- | Procedure signature and implementation binded up.
-type MethodHandler remote = (MethodName, HandlerBody remote)
-
--- | Similar to '==>@' but additionally pass caller address.
-handler  :: forall (remote :: * -> *) (req :: *) (resp :: *).
-           (KRPC req resp, Monad remote)
-        => (SockAddr -> req -> remote resp) -> MethodHandler remote
-handler body = (name, newbody)
-  where
-    Method name = method :: Method req resp
-
-    {-# INLINE newbody #-}
-    newbody addr KQuery {..} =
-      case fromBEncode queryArgs of
-        Left  e -> return $ Left $ KError ProtocolError (BC.pack e) queryId
-        Right a -> do
-          r <- body addr a
-          return $ Right $ KResponse (toBEncode r) queryId
-
-sockAddrFamily :: SockAddr -> Family
-sockAddrFamily (SockAddrInet  _ _    ) = AF_INET
-sockAddrFamily (SockAddrInet6 _ _ _ _) = AF_INET6
-sockAddrFamily (SockAddrUnix  _      ) = AF_UNIX
-
--- | Run server using a given port. Method invocation should be done manually.
-remoteServer :: (MonadBaseControl IO remote, MonadIO remote)
-             => SockAddr -- ^ Port number to listen.
-             -> (SockAddr -> KQuery -> remote (Either KError KResponse))
-             -> remote ()
-remoteServer servAddr action = bracket (liftIO bindServ) (liftIO . sClose) loop
-  where
-    bindServ = do
-        let family = sockAddrFamily servAddr
-        sock <- socket family Datagram defaultProtocol
-        when (family == AF_INET6) $ do
-          setSocketOption sock IPv6Only 0
-        bindSocket sock servAddr
-        return sock
-
-    loop sock = forever $ do
-        (bs, addr) <- liftIO $ BS.recvFrom sock maxMsgSize
-        reply <- handleMsg bs addr
-        liftIO $ sendMessage reply addr sock
-      where
-        handleMsg bs addr = case decode bs of
-          Right query -> (either toBEncode toBEncode <$> action addr query)
-              `Lifted.catch` (return . toBEncode . (`serverError` undefined ))
-          Left decodeE   -> return $ toBEncode $
-             KError ProtocolError (BC.pack decodeE) undefined
-
--- | Run RPC server on specified port by using list of handlers.
---   Server will dispatch procedure specified by callee, but note that
---   it will not create new thread for each connection.
---
-server :: (MonadBaseControl IO remote, MonadIO remote)
-       => SockAddr                -- ^ Port used to accept incoming connections.
-       -> [MethodHandler remote]  -- ^ Method table.
-       -> remote ()
-server servAddr handlers = do
-  remoteServer servAddr $ \addr q @ KQuery {..} -> do
-    case L.lookup  queryMethod handlers of
-      Nothing -> return $ Left $ KError MethodUnknown queryMethod queryId
-      Just  m -> m addr q
+import Network.KRPC.Method
+import Network.KRPC.Manager

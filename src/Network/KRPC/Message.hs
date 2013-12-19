@@ -19,10 +19,17 @@
 {-# LANGUAGE DefaultSignatures      #-}
 {-# LANGUAGE DeriveDataTypeable     #-}
 module Network.KRPC.Message
-       ( -- * Error
-         ErrorCode (..)
+       ( -- * Transaction
+         TransactionId
+       , unknownTransaction
+
+         -- * Error
+       , ErrorCode (..)
        , KError(..)
        , serverError
+       , decodeError
+       , unknownMethod
+       , unknownMessage
 
          -- * Query
        , KQuery(..)
@@ -30,6 +37,9 @@ module Network.KRPC.Message
 
          -- * Response
        , KResponse(..)
+
+         -- * Message
+       , KMessage (..)
        ) where
 
 import Control.Applicative
@@ -46,6 +56,9 @@ import Data.Typeable
 -- encoded as a short string of binary numbers, typically 2 characters
 -- are enough as they cover 2^16 outstanding queries.
 type TransactionId = ByteString
+
+unknownTransaction :: TransactionId
+unknownTransaction = ""
 
 {-----------------------------------------------------------------------
 -- Error messages
@@ -120,6 +133,15 @@ instance Exception KError
 serverError :: SomeException -> TransactionId -> KError
 serverError e = KError ServerError (BC.pack (show e))
 
+decodeError :: String -> TransactionId -> KError
+decodeError msg = KError ProtocolError (BC.pack msg)
+
+unknownMethod :: MethodName -> TransactionId -> KError
+unknownMethod = KError MethodUnknown
+
+unknownMessage :: String -> KError
+unknownMessage msg = KError ProtocolError (BC.pack msg) ""
+
 {-----------------------------------------------------------------------
 -- Query messages
 -----------------------------------------------------------------------}
@@ -184,3 +206,22 @@ instance BEncode KResponse where
     lookAhead $ match "y" (BString "r")
     KResponse <$>! "r" <*>! "t"
   {-# INLINE fromBEncode #-}
+
+{-----------------------------------------------------------------------
+-- Summed messages
+-----------------------------------------------------------------------}
+
+data KMessage
+  = Q KQuery
+  | R KResponse
+  | E KError
+
+instance BEncode KMessage where
+  toBEncode (Q q) = toBEncode q
+  toBEncode (R r) = toBEncode r
+  toBEncode (E e) = toBEncode e
+
+  fromBEncode b =
+        Q <$> fromBEncode b
+    <|> R <$> fromBEncode b
+    <|> E <$> fromBEncode b

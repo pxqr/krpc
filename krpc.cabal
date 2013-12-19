@@ -37,7 +37,10 @@ library
                      , RecordWildCards
   hs-source-dirs:      src
   exposed-modules:     Network.KRPC
-                     , Network.KRPC.Message
+                       Network.KRPC.Message
+                       Network.KRPC.Method
+                       Network.KRPC.Manager
+
   build-depends:       base          == 4.*
                      , bytestring   >= 0.10
                      , lifted-base   >= 0.1.1
@@ -45,6 +48,7 @@ library
                      , monad-control >= 0.3
                      , bencoding    >= 0.4.3
                      , network      >= 2.3
+                     , containers
 
   if impl(ghc < 7.6)
     build-depends:     ghc-prim
