@@ -86,16 +86,6 @@
 --
 --   For protocol details see 'Remote.KRPC.Protocol' module.
 --
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ViewPatterns        #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE DeriveDataTypeable  #-}
-{-# LANGUAGE ExplicitForAll      #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FunctionalDependencies #-}
 module Network.KRPC
        ( -- * Methods
          Method
@@ -103,10 +93,12 @@ module Network.KRPC
 
          -- * RPC
        , handler
+       , listen
        , query
 
          -- * Manager
        , MonadKRPC (..)
+       , Manager
        , newManager
 --       , closeManager
 

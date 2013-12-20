@@ -45,6 +45,7 @@ library
                      , bytestring   >= 0.10
                      , lifted-base   >= 0.1.1
                      , transformers  >= 0.2
+                     , mtl
                      , monad-control >= 0.3
                      , bencoding    >= 0.4.3
                      , network      >= 2.3
