@@ -11,6 +11,7 @@ module Network.KRPC.Manager
        , closeManager
        , query
 
+       , Handler
        , handler
        , listener
        , listen

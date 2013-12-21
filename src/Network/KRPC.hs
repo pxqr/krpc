@@ -92,6 +92,7 @@ module Network.KRPC
        , KRPC (..)
 
          -- * RPC
+       , Handler
        , handler
        , listen
        , query
@@ -100,7 +101,7 @@ module Network.KRPC
        , MonadKRPC (..)
        , Manager
        , newManager
---       , closeManager
+       , closeManager
 
          -- * Exceptions
        , KError (..)
