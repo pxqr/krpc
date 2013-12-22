@@ -79,7 +79,7 @@ seedTransaction :: Int
 seedTransaction = 0
 
 defaultQueryTimeout :: Int
-defaultQueryTimeout = 10
+defaultQueryTimeout = 120
 
 newManager :: SockAddr -> [Handler h] -> IO (Manager h)
 newManager servAddr handlers = do
