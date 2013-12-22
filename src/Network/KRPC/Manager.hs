@@ -192,7 +192,7 @@ dispatchHandler q @ KQuery {..} addr = do
 -----------------------------------------------------------------------}
 
 handleQuery :: MonadKRPC h m => KQuery -> SockAddr -> m ()
-handleQuery q addr = do
+handleQuery q addr = void $ fork $ do
   Manager {..} <- getManager
   res <- dispatchHandler q addr
   sendMessage sock addr $ either toBEncode toBEncode res
