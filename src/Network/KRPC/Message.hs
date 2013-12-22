@@ -227,6 +227,7 @@ data KMessage
   = Q KQuery
   | R KResponse
   | E KError
+    deriving (Show, Eq)
 
 instance BEncode KMessage where
   toBEncode (Q q) = toBEncode q
