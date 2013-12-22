@@ -148,11 +148,13 @@ query addr params = do
     sendMessage sock addr q
       `onException` unregisterQuery (tid, addr) pendingCalls
 
-    mres <- timeout (queryTimeout * 10 ^ 6) $ queryResponse ares
+    mres <- timeout (queryTimeout * 10 ^ (6 :: Int)) $ do
+      queryResponse ares
+
     case mres of
       Just res -> return res
       Nothing -> do
-        unregisterQuery (tid, addr) pendingCalls
+        _ <- unregisterQuery (tid, addr) pendingCalls
         throwIO $ timeoutExpired tid
 
 {-----------------------------------------------------------------------
