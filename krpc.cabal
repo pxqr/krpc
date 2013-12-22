@@ -12,10 +12,13 @@ tested-with:           GHC == 7.4.1
                      , GHC == 7.6.3
 homepage:              https://github.com/cobit/krpc
 bug-reports:           https://github.com/cobit/krpc/issues
-synopsis:              KRPC remote procedure call protocol implementation.
+synopsis:              KRPC protocol implementation
 description:
 
-  KRPC remote procedure call protocol implementation.
+  The KRPC protocol is a simple RPC mechanism consisting of bencoded
+  dictionaries sent over UDP.
+  .
+  <http://bittorrent.org/beps/bep_0005.html#krpc-protocol>
 
 extra-source-files:    README.md
                      , changelog
