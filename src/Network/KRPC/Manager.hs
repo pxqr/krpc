@@ -37,6 +37,7 @@ import Network.KRPC.Message
 import Network.KRPC.Method
 import Network.Socket hiding (listen)
 import Network.Socket.ByteString as BS
+import System.Timeout
 
 
 type KResult = Either KError KResponse
@@ -51,6 +52,7 @@ type Handler     h = (MethodName, HandlerBody h)
 
 data Manager h = Manager
   { sock               :: !Socket
+  , queryTimeout       :: !Int -- ^ in seconds
   , transactionCounter :: {-# UNPACK #-} !TransactionCounter
   , pendingCalls       :: {-# UNPACK #-} !PendingCalls
   , handlers           :: [Handler h]
@@ -76,12 +78,15 @@ sockAddrFamily (SockAddrUnix  _      ) = AF_UNIX
 seedTransaction :: Int
 seedTransaction = 0
 
+defaultQueryTimeout :: Int
+defaultQueryTimeout = 10
+
 newManager :: SockAddr -> [Handler h] -> IO (Manager h)
 newManager servAddr handlers = do
     sock  <- bindServ
     tran  <- newIORef seedTransaction
     calls <- newIORef M.empty
-    return $ Manager sock tran calls handlers
+    return $ Manager sock defaultQueryTimeout tran calls handlers
   where
     bindServ = do
       let family = sockAddrFamily servAddr
@@ -116,6 +121,8 @@ registerQuery cid ref = do
   atomicModifyIORef' ref $ \ m -> (M.insert cid ares m, ())
   return ares
 
+-- simultaneous M.lookup and M.delete guarantees that we never get two
+-- or more responses to the same query
 unregisterQuery :: CallId -> PendingCalls -> IO (Maybe CallRes)
 unregisterQuery cid ref = do
   atomicModifyIORef' ref $ swap .
@@ -123,13 +130,11 @@ unregisterQuery cid ref = do
 
 queryResponse :: BEncode a => CallRes -> IO a
 queryResponse ares = do
-  res  <- readMVar ares
-  case res of
-    Left  e -> throwIO e
-    Right (KResponse {..}) ->
-      case fromBEncode respVals of
-        Left e  -> throwIO (KError ProtocolError (BC.pack e) respId)
-        Right a -> return a
+  res <- readMVar ares
+  KResponse {..} <- either throwIO pure res
+  case fromBEncode respVals of
+    Right r -> pure r
+    Left  e -> throwIO $ decodeError e respId
 
 query :: forall h m a b. (MonadKRPC h m, KRPC a b) => SockAddr -> a -> m b
 query addr params = do
@@ -138,11 +143,17 @@ query addr params = do
     tid <- genTransactionId transactionCounter
     let Method name = method :: Method a b
     let q = KQuery (toBEncode params) name tid
+
     ares <- registerQuery (tid, addr) pendingCalls
     sendMessage sock addr q
       `onException` unregisterQuery (tid, addr) pendingCalls
-    res <- queryResponse ares
-    return res
+
+    mres <- timeout (queryTimeout * 10 ^ 6) $ queryResponse ares
+    case mres of
+      Just res -> return res
+      Nothing -> do
+        unregisterQuery (tid, addr) pendingCalls
+        throwIO $ timeoutExpired tid
 
 {-----------------------------------------------------------------------
 --  Handlers
