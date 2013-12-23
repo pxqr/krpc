@@ -63,6 +63,7 @@ showsMethod (Method name) =
 class (BEncode req, BEncode resp) => KRPC req resp | req -> resp where
   method :: Method req resp
 
+  -- TODO add underscores
   default method :: Typeable req => Method req resp
   method = Method $ fromString $ L.map toLower $ show $ typeOf hole
     where

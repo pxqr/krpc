@@ -5,9 +5,10 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   This module provides straightforward implementation of KRPC
---   protocol. In many situations 'Network.KRPC' should be prefered
---   since it gives more safe, convenient and high level api.
+--   KRPC messages types used in communication. All messages are
+--   encoded as bencode dictionary.
+--
+--   Normally, you don't need to import this module.
 --
 --   See <http://www.bittorrent.org/beps/bep_0005.html#krpc-protocol>
 --
@@ -21,7 +22,6 @@
 module Network.KRPC.Message
        ( -- * Transaction
          TransactionId
-       , unknownTransaction
 
          -- * Error
        , ErrorCode (..)
@@ -65,6 +65,7 @@ unknownTransaction = ""
 -- Error messages
 -----------------------------------------------------------------------}
 
+-- | Types of RPC errors.
 data ErrorCode
     -- | Some error doesn't fit in any other category.
   = GenericError
@@ -79,6 +80,8 @@ data ErrorCode
   | MethodUnknown
     deriving (Show, Read, Eq, Ord, Bounded, Typeable)
 
+-- | According to the table:
+-- <http://bittorrent.org/beps/bep_0005.html#errors>
 instance Enum ErrorCode where
   fromEnum GenericError  = 201
   fromEnum ServerError   = 202
@@ -100,22 +103,31 @@ instance BEncode ErrorCode where
   fromBEncode b = toEnum <$> fromBEncode b
   {-# INLINE fromBEncode #-}
 
--- | Errors used to signal that some error occurred while processing a
--- procedure call. Error may be send only from server to client but
--- not in the opposite direction.
---
---   Errors are encoded as bencoded dictionary:
---
---   > { "y" : "e", "e" : [<error_code>, <human_readable_error_reason>] }
+-- | Errors are sent when a query cannot be fulfilled. Error message
+--   can be send only from server to client but not in the opposite
+--   direction.
 --
 data KError = KError
-  { errorCode    :: !ErrorCode
-  , errorMessage :: !ByteString
-  , errorId      :: !TransactionId
+  { errorCode    :: !ErrorCode     -- ^ the type of error;
+  , errorMessage :: !ByteString    -- ^ human-readable text message;
+  , errorId      :: !TransactionId -- ^ match to the corresponding 'queryId'.
   } deriving (Show, Read, Eq, Ord, Typeable)
 
+-- | Errors, or KRPC message dictionaries with a \"y\" value of \"e\",
+--   contain one additional key \"e\". The value of \"e\" is a
+--   list. The first element is an integer representing the error
+--   code. The second element is a string containing the error
+--   message.
+--
+--   Example Error Packet:
+--
+--   > { "t": "aa", "y":"e", "e":[201, "A Generic Error Ocurred"]}
+--
+--   or bencoded:
+--
+--   > d1:eli201e23:A Generic Error Ocurrede1:t2:aa1:y1:ee
+--
 instance BEncode KError where
-
   toBEncode KError {..} = toDict $
        "e" .=! (errorCode, errorMessage)
     .: "t" .=! errorId
@@ -131,7 +143,7 @@ instance BEncode KError where
 
 instance Exception KError
 
--- | Happen when some handler fail.
+-- | Happen when some query handler fail.
 serverError :: SomeException -> TransactionId -> KError
 serverError e = KError ServerError (BC.pack (show e))
 
@@ -164,16 +176,21 @@ type MethodName = ByteString
 -- callee and pass arguments in. Therefore query may be only sent from
 -- client to server but not in the opposite direction.
 --
---   Queries are encoded as bencoded dictionary:
---
---    > { "y" : "q", "q" : "<method_name>", "a" : [<arg1>, <arg2>, ...] }
---
 data KQuery = KQuery
-  { queryArgs   :: !BValue
-  , queryMethod :: !MethodName
-  , queryId     :: !TransactionId
+  { queryArgs   :: !BValue         -- ^ values to be passed to method;
+  , queryMethod :: !MethodName     -- ^ method to call;
+  , queryId     :: !TransactionId  -- ^ one-time query token.
   } deriving (Show, Read, Eq, Ord, Typeable)
 
+-- | Queries, or KRPC message dictionaries with a \"y\" value of
+-- \"q\", contain two additional keys; \"q\" and \"a\". Key \"q\" has
+-- a string value containing the method name of the query. Key \"a\"
+-- has a dictionary value containing named arguments to the query.
+--
+--    Example Query packet:
+--
+--    > { "t" : "aa", "y" : "q", "q" : "ping", "a" : { "msg" : "hi!" } }
+--
 instance BEncode KQuery where
   toBEncode KQuery {..} = toDict $
        "a" .=! queryArgs
@@ -192,20 +209,30 @@ instance BEncode KQuery where
 -- Response messages
 -----------------------------------------------------------------------}
 
--- | KResponse used to signal that callee successufully process a
--- procedure call and to return values from procedure. KResponse should
--- not be sent if error occurred during RPC. Thus KResponse may be only
--- sent from server to client.
+-- | Response messages are sent upon successful completion of a
+-- query:
 --
---   Responses are encoded as bencoded dictionary:
+--   * KResponse used to signal that callee successufully process a
+--   procedure call and to return values from procedure.
 --
---   > { "y" : "r", "r" : [<val1>, <val2>, ...] }
+--   * KResponse should not be sent if error occurred during RPC,
+--   'KError' should be sent instead.
+--
+--   * KResponse can be only sent from server to client.
 --
 data KResponse = KResponse
-  { respVals :: BValue
-  , respId   :: TransactionId
+  { respVals :: BValue         -- ^ 'BDict' containing return values;
+  , respId   :: TransactionId  -- ^ match to the corresponding 'queryId'.
   } deriving (Show, Read, Eq, Ord, Typeable)
 
+-- | Responses, or KRPC message dictionaries with a \"y\" value of
+-- \"r\", contain one additional key \"r\". The value of \"r\" is a
+-- dictionary containing named return values.
+--
+--   Example Response packet:
+--
+--   > { "t" : "aa", "y" : "r", "r" : { "msg" : "you've sent: hi!" } }
+--
 instance BEncode KResponse where
   toBEncode KResponse {..} = toDict $
        "r" .=! respVals
@@ -223,6 +250,7 @@ instance BEncode KResponse where
 -- Summed messages
 -----------------------------------------------------------------------}
 
+-- | Generic KRPC message.
 data KMessage
   = Q KQuery
   | R KResponse
@@ -238,3 +266,4 @@ instance BEncode KMessage where
         Q <$> fromBEncode b
     <|> R <$> fromBEncode b
     <|> E <$> fromBEncode b
+    <|> decodingError "KMessage: unknown message or message tag"
