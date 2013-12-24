@@ -1,33 +1,32 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 module Main (main) where
-
 import Control.Monad
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
+import Control.Monad.Reader
 import Criterion.Main
+import Data.ByteString as BS
 import Network.KRPC
-import Network.Socket
 
+instance KRPC ByteString ByteString where
+  method = "echo"
 
-addr :: RemoteAddr
-addr = SockAddrInet 6000 0
+echo :: Handler IO
+echo = handler $ \ _ bs -> return (bs :: ByteString)
 
-echo :: Method ByteString ByteString
-echo = method "echo" ["x"] ["x"]
+addr :: SockAddr
+addr = SockAddrInet 6000 (256 * 256 * 256 + 127)
 
 main :: IO ()
-main = withRemote $ \remote -> do {
-  ; let sizes = [10, 100, 1000, 10000, 16 * 1024]
-  ; let repetitions = [1, 10, 100, 1000]
-  ; let params = [(r, s) | r <- repetitions, s <- sizes]
-  ; let benchmarks = map (uncurry (mkbench_ remote)) params
-  ; defaultMain benchmarks
-  }
+main = withManager addr [echo] $ \ m -> (`runReaderT` m) $ do
+    listen
+    liftIO $ defaultMain (benchmarks m)
   where
-    mkbench_ re r n = bench (show r ++ "/" ++ show n) $ nfIO $
-                  replicateM r $ call_ re addr echo (B.replicate n 0)
-
-{-
-  forM_ [1..] $ const $ do
-    async addr myconcat (replicate 100 [1..10])
--}
+    sizes        = [10, 100, 1000, 10000, 16 * 1024]
+    repetitions  = [1, 10, 100, 1000]
+    benchmarks m = [mkbench m r s | r <- repetitions, s <- sizes]
+      where
+        mkbench m r n =
+          bench (show r ++ "times" ++ "/" ++ show n ++ "bytes") $ nfIO $
+            replicateM r $
+              runReaderT (query addr (BS.replicate n 0)) m

@@ -107,8 +107,12 @@ module Network.KRPC
          -- * Exceptions
        , KError (..)
        , ErrorCode (..)
+
+         -- * Re-export
+       , SockAddr (..)
        ) where
 
 import Network.KRPC.Message
 import Network.KRPC.Method
 import Network.KRPC.Manager
+import Network.Socket (SockAddr (..))
