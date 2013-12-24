@@ -55,6 +55,7 @@ type Handler     h = (MethodName, HandlerBody h)
 data Manager h = Manager
   { sock               :: !Socket
   , queryTimeout       :: !Int -- ^ in seconds
+  , listenerThread     :: !(MVar ThreadId)
   , transactionCounter :: {-# UNPACK #-} !TransactionCounter
   , pendingCalls       :: {-# UNPACK #-} !PendingCalls
   , handlers           :: [Handler h]
@@ -67,6 +68,9 @@ class (MonadBaseControl IO m, MonadIO m) => MonadKRPC h m | m -> h where
   getManager = ask
 
   liftHandler :: h a -> m a
+
+  default liftHandler :: m a -> m a
+  liftHandler = id
 
 instance (MonadBaseControl IO h, MonadIO h)
       => MonadKRPC h (ReaderT (Manager h) h) where
@@ -86,9 +90,10 @@ defaultQueryTimeout = 120
 newManager :: SockAddr -> [Handler h] -> IO (Manager h)
 newManager servAddr handlers = do
     sock  <- bindServ
+    tref  <- newEmptyMVar
     tran  <- newIORef seedTransaction
     calls <- newIORef M.empty
-    return $ Manager sock defaultQueryTimeout tran calls handlers
+    return $ Manager sock defaultQueryTimeout tref tran calls handlers
   where
     bindServ = do
       let family = sockAddrFamily servAddr
@@ -101,9 +106,11 @@ newManager servAddr handlers = do
 -- | Unblock all pending calls and close socket.
 closeManager :: Manager m -> IO ()
 closeManager Manager {..} = do
+  maybe (return ()) killThread =<< tryTakeMVar listenerThread
   -- TODO unblock calls
   close sock
 
+-- | Normally you should use Control.Monad.Trans.allocate function.
 withManager :: SockAddr -> [Handler h] -> (Manager h -> IO a) -> IO a
 withManager addr hs = bracket (newManager addr hs) closeManager
 
@@ -236,5 +243,10 @@ listener = do
       Left  e -> liftIO $ sendMessage sock addr  $ unknownMessage e
       Right m -> handleMessage m addr
 
-listen :: MonadKRPC h m => m ThreadId
-listen = fork $ listener
+-- | Should be run before any 'query', otherwise they will never
+-- succeed.
+listen :: MonadKRPC h m => m ()
+listen = do
+  Manager {..} <- getManager
+  tid <- fork $ listener
+  liftIO $ putMVar listenerThread tid
