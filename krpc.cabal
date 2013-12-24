@@ -64,8 +64,13 @@ test-suite spec
   default-language:    Haskell2010
   hs-source-dirs:      tests
   main-is:             Spec.hs
+  other-modules:       Network.KRPCSpec
+                       Network.KRPC.MethodSpec
+                       Network.KRPC.MessageSpec
   build-depends:       base        == 4.*
                      , bytestring
+                     , network
+                     , mtl
 
                      , hspec
                      , QuickCheck
@@ -73,37 +78,6 @@ test-suite spec
 
                      , bencoding
                      , krpc
-
---test-suite test-client
---  type:                exitcode-stdio-1.0
---  default-language:    Haskell2010
---  hs-source-dirs:      tests
---  main-is:             Client.hs
---  other-modules:       Shared
---  build-depends:       base        == 4.*
---                     , bytestring
---                     , process
---                     , filepath
---
---                     , bencoding
---                     , krpc
---                     , network
---
---                     , HUnit
---                     , test-framework
---                     , test-framework-hunit
-
-
---executable test-server
---  default-language:    Haskell2010
---  hs-source-dirs:      tests
---  main-is:             Server.hs
---  other-modules:       Shared
---  build-depends:       base        == 4.*
---                     , bytestring
---                     , bencoding
---                     , krpc
---                     , network
 
 --executable bench-server
 --  default-language:    Haskell2010
@@ -115,14 +89,14 @@ test-suite spec
 --                     , network
 --  ghc-options:         -fforce-recomp
 
-benchmark bench-client
-  type:                exitcode-stdio-1.0
-  default-language:    Haskell2010
-  hs-source-dirs:      bench
-  main-is:             Main.hs
-  build-depends:       base == 4.*
-                     , bytestring
-                     , criterion
-                     , krpc
-                     , network
-  ghc-options:         -O2 -fforce-recomp
+--benchmark bench-client
+--  type:                exitcode-stdio-1.0
+--  default-language:    Haskell2010
+--  hs-source-dirs:      bench
+--  main-is:             Main.hs
+--  build-depends:       base == 4.*
+--                     , bytestring
+--                     , criterion
+--                     , krpc
+--                     , network
+--  ghc-options:         -O2 -fforce-recomp

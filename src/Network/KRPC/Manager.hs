@@ -9,6 +9,8 @@ module Network.KRPC.Manager
        , Manager
        , newManager
        , closeManager
+       , withManager
+
        , query
 
        , Handler
@@ -102,6 +104,9 @@ closeManager Manager {..} = do
   -- TODO unblock calls
   close sock
 
+withManager :: SockAddr -> [Handler h] -> (Manager h -> IO a) -> IO a
+withManager addr hs = bracket (newManager addr hs) closeManager
+
 sendMessage :: MonadIO m => BEncode a => Socket -> SockAddr -> a -> m ()
 sendMessage sock addr a = do
   liftIO $ sendManyTo sock (BL.toChunks (BE.encode a)) addr
@@ -136,6 +141,11 @@ queryResponse ares = do
     Right r -> pure r
     Left  e -> throwIO $ decodeError e respId
 
+-- |
+--
+--  This function will throw exception if quered node respond with
+--  @error@ message or timeout expires.
+--
 query :: forall h m a b. (MonadKRPC h m, KRPC a b) => SockAddr -> a -> m b
 query addr params = do
   Manager {..} <- getManager
@@ -161,6 +171,8 @@ query addr params = do
 --  Handlers
 -----------------------------------------------------------------------}
 
+-- | Any thrown exception will be supressed and send over wire back to
+-- the quering node.
 handler :: forall h a b. (KRPC a b, Monad h)
         => (SockAddr -> a -> h b) -> Handler h
 handler body = (name, wrapper)

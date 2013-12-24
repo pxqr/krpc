@@ -94,7 +94,6 @@ module Network.KRPC
          -- * RPC
        , Handler
        , handler
-       , listen
        , query
 
          -- * Manager
@@ -102,9 +101,12 @@ module Network.KRPC
        , Manager
        , newManager
        , closeManager
+       , withManager
+       , listen
 
          -- * Exceptions
        , KError (..)
+       , ErrorCode (..)
        ) where
 
 import Network.KRPC.Message
