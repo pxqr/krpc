@@ -1,3 +1,13 @@
+2013-12-25  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	0.5.0.0: Major API changes.
+
+	* Added transaction handling;
+	* Use the same socket for server and client;
+	* New query function will infer query method from request/response
+	datatypes.
+	* Added MonadKRPC and KRPC classes.
+
 2013-11-26  Sam Truzjan  <pxqr.sta@gmail.com>
 
 	* 0.4.1.1: Fixed build failure on GHC == 7.4.*
