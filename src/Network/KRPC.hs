@@ -6,8 +6,8 @@
 --   Portability :  portable
 --
 --   This module provides safe remote procedure call. One important
---   point is exceptions and errors, so be able handle them properly
---   we need to investigate a bit about how this all works.
+--   point is exceptions and errors, so to be able handle them
+--   properly we need to investigate a bit about how this all works.
 --   Internally, in order to make method invokation KRPC makes the
 --   following steps:
 --
@@ -41,50 +41,14 @@
 --     * Caller extracts results and finally return results of the
 --     procedure call as ordinary haskell values.
 --
---   If every other error occurred caller get the 'GenericError'. All
---   errors returned by callee are throwed as ordinary haskell
---   exceptions at caller side. Make sure that both callee and caller
---   uses the same method signatures and everything should be ok: this
---   KRPC implementation provides some level of safety through
---   types. Also note that both caller and callee use plain UDP, so
---   KRPC is unreliable.
+--   If every other error occurred then caller get the
+--   'GenericError'. All errors returned by callee are throwed as
+--   ordinary haskell exceptions at caller side. Also note that both
+--   caller and callee use plain UDP, so KRPC is unreliable.
 --
---   Consider one tiny example. From now @caller = client@ and
---   @callee = server or remote@.
+--   For async 'query' use @async@ package.
 --
---   Somewhere we have to define all procedure signatures. Imagine
---   that this is a library shared between client and server:
---
---   >  factorialMethod :: Method Int Int
---   >  factorialMethod = method "factorial" ["x"] ["y"]
---
---   Otherwise you can define this code in both client and server of
---   course. But in this case you might get into troubles: you can get
---   'MethodUnknown' or 'ProtocolError' if name or type of method
---   will mismatch after not synced changes in client or server code.
---
---   Now let's define our client-side:
---
---   > main = withRemote  $ \remote -> do
---   >    result <- call remote (0, 6000) factorialMethod 4
---   >    assert (result == 24) $ print "Success!"
---
---   It basically open socket with 'withRemote' and make all the other
---   steps in 'call' as describe above. And finally our server-side:
---
---   > factorialImpl :: Int -> Int
---   > factorialImpl n = product [1..n]
---   >
---   > main = runServer [factorialMethod $ return . factorialImpl]
---
---   Here we implement method signature from that shared lib and run
---   server with runServer by passing method table in.
---
---   For async API use /async/ package, old API have been removed.
---
---   For more examples see @exsamples@ or @tests@ directories.
---
---   For protocol details see 'Remote.KRPC.Protocol' module.
+--   For protocol details see "Network.KRPC.Message" module.
 --
 module Network.KRPC
        ( -- * Methods

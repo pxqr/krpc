@@ -50,8 +50,13 @@ type CallRes            = MVar KResult
 type PendingCalls       = IORef (Map CallId CallRes)
 
 type HandlerBody h = SockAddr -> BValue -> h (BE.Result BValue)
+
+-- | Handler is a function which will be invoked then some /remote/
+-- node querying /this/ node.
 type Handler     h = (MethodName, HandlerBody h)
 
+-- | Keep track pending queries made by /this/ node and handle queries
+-- made by /remote/ nodes.
 data Manager h = Manager
   { sock               :: !Socket
   , queryTimeout       :: !Int -- ^ in seconds
@@ -61,12 +66,15 @@ data Manager h = Manager
   , handlers           :: [Handler h]
   }
 
+-- | A monad which can perform or handle queries.
 class (MonadBaseControl IO m, MonadIO m) => MonadKRPC h m | m -> h where
+  -- | Ask for manager.
   getManager :: m (Manager h)
 
   default getManager :: MonadReader (Manager h) m => m (Manager h)
   getManager = ask
 
+  -- | Can be used to add logging for instance.
   liftHandler :: h a -> m a
 
   default liftHandler :: m a -> m a
@@ -87,7 +95,11 @@ seedTransaction = 0
 defaultQueryTimeout :: Int
 defaultQueryTimeout = 120
 
-newManager :: SockAddr -> [Handler h] -> IO (Manager h)
+-- | Bind socket to the specified address. To enable query handling
+-- run 'listen'.
+newManager :: SockAddr       -- ^ address to listen on;
+           -> [Handler h]    -- ^ handlers to run on incoming queries.
+           -> IO (Manager h) -- ^ new manager.
 newManager servAddr handlers = do
     sock  <- bindServ
     tref  <- newEmptyMVar
@@ -110,17 +122,18 @@ closeManager Manager {..} = do
   -- TODO unblock calls
   close sock
 
--- | Normally you should use Control.Monad.Trans.allocate function.
+-- | Normally you should use Control.Monad.Trans.Resource.allocate
+-- function.
 withManager :: SockAddr -> [Handler h] -> (Manager h -> IO a) -> IO a
 withManager addr hs = bracket (newManager addr hs) closeManager
-
-sendMessage :: MonadIO m => BEncode a => Socket -> SockAddr -> a -> m ()
-sendMessage sock addr a = do
-  liftIO $ sendManyTo sock (BL.toChunks (BE.encode a)) addr
 
 {-----------------------------------------------------------------------
 --  Client
 -----------------------------------------------------------------------}
+
+sendMessage :: MonadIO m => BEncode a => Socket -> SockAddr -> a -> m ()
+sendMessage sock addr a = do
+  liftIO $ sendManyTo sock (BL.toChunks (BE.encode a)) addr
 
 genTransactionId :: TransactionCounter -> IO TransactionId
 genTransactionId ref = do
@@ -148,7 +161,7 @@ queryResponse ares = do
     Right r -> pure r
     Left  e -> throwIO $ decodeError e respId
 
--- |
+-- | Enqueue query to the given node.
 --
 --  This function will throw exception if quered node respond with
 --  @error@ message or timeout expires.
@@ -178,8 +191,8 @@ query addr params = do
 --  Handlers
 -----------------------------------------------------------------------}
 
--- | Any thrown exception will be supressed and send over wire back to
--- the quering node.
+-- | Make handler from handler function. Any thrown exception will be
+-- supressed and send over the wire back to the querying node.
 handler :: forall h a b. (KRPC a b, Monad h)
         => (SockAddr -> a -> h b) -> Handler h
 handler body = (name, wrapper)
