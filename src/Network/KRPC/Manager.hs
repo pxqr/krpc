@@ -1,3 +1,12 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   Normally, you don't need to import this module.
+--
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DefaultSignatures   #-}
@@ -5,18 +14,18 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances      #-}
 module Network.KRPC.Manager
-       ( MonadKRPC (..)
+       ( -- * Manager
+         MonadKRPC (..)
        , Manager
        , newManager
        , closeManager
        , withManager
+       , listen
 
+         -- * Queries
        , query
-
        , Handler
        , handler
-       , listener
-       , listen
        ) where
 
 import Control.Applicative
