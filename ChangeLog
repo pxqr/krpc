@@ -1,0 +1,38 @@
+2013-11-26  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* 0.4.1.1: Fixed build failure on GHC == 7.4.*
+
+2013-10-17  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* 0.4.1.0: Use bencoding-0.4.*
+
+2013-10-03  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* 0.4.0.1: Minor documentation fixes.
+
+2013-10-03  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* 0.4.0.0: IPv6 support.
+
+2013-09-28  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* 0.3.0.0: Use bencoding-0.3.*
+        * Rename Remote.* to Network.* modules.
+
+2013-09-28  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* 0.2.2.0: Use bencoding-0.2.2.*
+
+2013-08-27  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* 0.2.0.0: Async API have been removed, use /async/ package
+	instead.
+	* Expose caller address in handlers.
+
+2013-07-09  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* 0.1.1.0: Allow passing raw argument\/result dictionaries.
+
+2013-07-09  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* 0.1.0.0: Initial version.

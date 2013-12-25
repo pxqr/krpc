@@ -21,7 +21,7 @@ description:
   <http://bittorrent.org/beps/bep_0005.html#krpc-protocol>
 
 extra-source-files:    README.md
-                     , changelog
+                     , ChangeLog
 
 source-repository head
   type:                git
