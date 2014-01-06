@@ -1,7 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Network.KRPCSpec (spec) where
+import Control.Monad.Logger
 import Control.Monad.Reader
-import Network.Socket (SockAddr (..))
 import Network.KRPC
 import Network.KRPC.MethodSpec hiding (spec)
 import Test.Hspec
@@ -15,6 +16,9 @@ handlers =
  , handler $ \ _ (Echo a) -> return (Echo (a :: Bool))
  , handler $ \ _ (Echo a) -> return (Echo (a :: Int))
  ]
+
+instance MonadLogger IO where
+  monadLoggerLog _ _ _ _ = return ()
 
 spec :: Spec
 spec = do

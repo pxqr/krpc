@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 module Main (main) where
 import Control.Monad
+import Control.Monad.Logger
 import Control.Monad.Reader
 import Criterion.Main
 import Data.ByteString as BS
@@ -10,6 +11,9 @@ import Network.KRPC
 
 instance KRPC ByteString ByteString where
   method = "echo"
+
+instance MonadLogger IO where
+  monadLoggerLog _ _ _ _ = return ()
 
 echo :: Handler IO
 echo = handler $ \ _ bs -> return (bs :: ByteString)
@@ -26,7 +30,7 @@ main = withManager addr [echo] $ \ m -> (`runReaderT` m) $ do
     repetitions  = [1, 10, 100, 1000]
     benchmarks m = [mkbench m r s | r <- repetitions, s <- sizes]
       where
-        mkbench m r n =
+        mkbench action r n =
           bench (show r ++ "times" ++ "/" ++ show n ++ "bytes") $ nfIO $
             replicateM r $
-              runReaderT (query addr (BS.replicate n 0)) m
+              runReaderT (query addr (BS.replicate n 0)) action

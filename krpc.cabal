@@ -70,6 +70,7 @@ test-suite spec
                      , bytestring
                      , network
                      , mtl
+                     , monad-logger
                      , hspec
                      , QuickCheck
                      , quickcheck-instances
@@ -84,6 +85,7 @@ benchmark bench
   build-depends:       base == 4.*
                      , bytestring
                      , mtl
+                     , monad-logger
                      , criterion
                      , krpc
   ghc-options:         -O2 -fforce-recomp
