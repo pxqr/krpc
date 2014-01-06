@@ -40,6 +40,7 @@ import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.BEncode as BE
+import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy as BL
 import Data.IORef
@@ -53,6 +54,7 @@ import Network.KRPC.Message
 import Network.KRPC.Method
 import Network.Socket hiding (listen)
 import Network.Socket.ByteString as BS
+import System.IO.Error
 import System.Timeout
 
 
@@ -303,10 +305,17 @@ listener :: MonadKRPC h m => m ()
 listener = do
   Manager {..} <- getManager
   forever $ do
-    (bs, addr) <- liftIO $ BS.recvFrom sock maxMsgSize
+    (bs, addr) <- liftIO $ handle exceptions $ BS.recvFrom sock maxMsgSize
     case BE.decode bs of
-      Left  e -> liftIO $ sendMessage sock addr  $ unknownMessage e
+      -- TODO ignore unknown messages at all?
+      Left  e -> liftIO $ sendMessage sock addr $ unknownMessage e
       Right m -> handleMessage m addr
+  where
+    exceptions :: IOError -> IO (BS.ByteString, SockAddr)
+    exceptions e
+        -- packets with empty payload may trigger eof exception
+      | isEOFError e = return  ("", SockAddrInet 0 0)
+      |   otherwise  = throwIO e
 
 -- | Should be run before any 'query', otherwise they will never
 -- succeed.
