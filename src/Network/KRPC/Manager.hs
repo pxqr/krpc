@@ -31,7 +31,6 @@ module Network.KRPC.Manager
        ) where
 
 import Control.Applicative
-import Control.Arrow
 import Control.Concurrent
 import Control.Concurrent.Lifted (fork)
 import Control.Exception hiding (Handler)
@@ -146,6 +145,17 @@ withManager :: SockAddr -> [Handler h] -> (Manager h -> IO a) -> IO a
 withManager addr hs = bracket (newManager addr hs) closeManager
 
 {-----------------------------------------------------------------------
+--  Logging
+-----------------------------------------------------------------------}
+
+querySignature :: MethodName -> TransactionId -> SockAddr -> Text
+querySignature name transaction addr = T.concat
+  [  "&", T.decodeUtf8 name
+  , " #", T.decodeUtf8 transaction
+  , " @", T.pack (show addr)
+  ]
+
+{-----------------------------------------------------------------------
 --  Client
 -----------------------------------------------------------------------}
 
@@ -189,9 +199,7 @@ query addr params = do
   Manager {..} <- getManager
   tid <- liftIO $ genTransactionId transactionCounter
   let queryMethod = method :: Method a b
-  let signature = T.pack (show queryMethod)
-               <> " @" <> T.pack (show addr)
-               <> " #" <> T.decodeUtf8 tid
+  let signature = querySignature (methodName queryMethod) tid addr
   $(logDebugS) "query.sending" signature
 
   mres <- liftIO $ do
@@ -233,12 +241,28 @@ handler body = (name, wrapper)
           r <- body addr a
           return $ Right $ toBEncode r
 
-runHandler :: MonadKRPC h m => HandlerBody h -> SockAddr -> KQuery -> m KResult
+runHandler :: MonadKRPC h m
+           => HandlerBody h -> SockAddr -> KQuery -> m KResult
 runHandler h addr KQuery {..} = wrapper `Lifted.catch` failback
   where
-    wrapper = ((`decodeError` queryId) +++ (`KResponse` queryId))
-           <$> liftHandler (h addr queryArgs)
-    failback e = return $ Left $ serverError e queryId
+    signature = querySignature queryMethod queryId addr
+
+    wrapper = do
+      $(logDebugS) "handler.quered" signature
+      result <- liftHandler (h addr queryArgs)
+
+      case result of
+        Left msg -> do
+          $(logDebugS) "handler.failed" $ signature <> " !" <> T.pack msg
+          return $ Left  $ decodeError msg queryId
+
+        Right a -> do
+          $(logDebugS) "handler.success" signature
+          return $ Right $ a `KResponse`   queryId
+
+    failback e = do
+      $(logDebugS) "handler.errored" signature
+      return $ Left $ serverError e queryId
 
 dispatchHandler :: MonadKRPC h m => KQuery -> SockAddr -> m KResult
 dispatchHandler q @ KQuery {..} addr = do
