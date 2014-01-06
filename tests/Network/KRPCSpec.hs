@@ -20,18 +20,21 @@ handlers =
 instance MonadLogger IO where
   monadLoggerLog _ _ _ _ = return ()
 
+opts :: Options
+opts = def { optQueryTimeout = 1 }
+
 spec :: Spec
 spec = do
   describe "query" $ do
     it "run handlers" $ do
       let int = 0xabcd :: Int
-      (withManager servAddr handlers $ runReaderT $ do
+      (withManager opts servAddr handlers $ runReaderT $ do
          listen
          query servAddr (Echo int))
        `shouldReturn` Echo int
 
     it "throw timeout exception" $ do
-      (withManager servAddr handlers $ runReaderT $ do
+      (withManager opts servAddr handlers $ runReaderT $ do
          query servAddr (Echo (0xabcd :: Int))
        )
         `shouldThrow` (== KError GenericError "timeout expired" "0")

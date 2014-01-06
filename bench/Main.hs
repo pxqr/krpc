@@ -22,7 +22,7 @@ addr :: SockAddr
 addr = SockAddrInet 6000 (256 * 256 * 256 + 127)
 
 main :: IO ()
-main = withManager addr [echo] $ \ m -> (`runReaderT` m) $ do
+main = withManager def addr [echo] $ \ m -> (`runReaderT` m) $ do
     listen
     liftIO $ defaultMain (benchmarks m)
   where

@@ -18,6 +18,7 @@
 module Network.KRPC.Manager
        ( -- * Manager
          MonadKRPC (..)
+       , Options (..)
        , Manager
        , newManager
        , closeManager
@@ -43,6 +44,7 @@ import Data.BEncode as BE
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy as BL
+import Data.Default.Class
 import Data.IORef
 import Data.List as L
 import Data.Map as M
@@ -57,6 +59,41 @@ import Network.Socket.ByteString as BS
 import System.IO.Error
 import System.Timeout
 
+
+{-----------------------------------------------------------------------
+--  Options
+-----------------------------------------------------------------------}
+
+-- | RPC manager options.
+data Options = Options
+  { -- | Initial 'TransactionId' incremented with each 'query';
+    optSeedTransaction :: Int
+
+    -- | Time to wait for response from remote node, in seconds.
+  , optQueryTimeout    :: Int
+  } deriving (Show, Eq)
+
+defaultSeedTransaction :: Int
+defaultSeedTransaction = 0
+
+defaultQueryTimeout :: Int
+defaultQueryTimeout = 120
+
+-- | Permissive defaults.
+instance Default Options where
+  def = Options
+    { optSeedTransaction = defaultSeedTransaction
+    , optQueryTimeout    = defaultQueryTimeout
+    }
+
+validateOptions :: Options -> IO ()
+validateOptions Options {..}
+  | optQueryTimeout < 1 = throwIO (userError "non-positive query timeout")
+  |       otherwise     = return ()
+
+{-----------------------------------------------------------------------
+--  Options
+-----------------------------------------------------------------------}
 
 type KResult = Either KError KResponse
 
@@ -108,23 +145,19 @@ sockAddrFamily (SockAddrInet  _ _    ) = AF_INET
 sockAddrFamily (SockAddrInet6 _ _ _ _) = AF_INET6
 sockAddrFamily (SockAddrUnix  _      ) = AF_UNIX
 
-seedTransaction :: Int
-seedTransaction = 0
-
-defaultQueryTimeout :: Int
-defaultQueryTimeout = 120
-
 -- | Bind socket to the specified address. To enable query handling
 -- run 'listen'.
-newManager :: SockAddr       -- ^ address to listen on;
+newManager :: Options        -- ^ various protocol options;
+           -> SockAddr       -- ^ address to listen on;
            -> [Handler h]    -- ^ handlers to run on incoming queries.
-           -> IO (Manager h) -- ^ new manager.
-newManager servAddr handlers = do
+           -> IO (Manager h) -- ^ new rpc manager.
+newManager opts @ Options {..} servAddr handlers = do
+    validateOptions opts
     sock  <- bindServ
     tref  <- newEmptyMVar
-    tran  <- newIORef seedTransaction
+    tran  <- newIORef optSeedTransaction
     calls <- newIORef M.empty
-    return $ Manager sock defaultQueryTimeout tref tran calls handlers
+    return $ Manager sock optQueryTimeout tref tran calls handlers
   where
     bindServ = do
       let family = sockAddrFamily servAddr
@@ -143,8 +176,9 @@ closeManager Manager {..} = do
 
 -- | Normally you should use Control.Monad.Trans.Resource.allocate
 -- function.
-withManager :: SockAddr -> [Handler h] -> (Manager h -> IO a) -> IO a
-withManager addr hs = bracket (newManager addr hs) closeManager
+withManager :: Options -> SockAddr -> [Handler h]
+            -> (Manager h -> IO a) -> IO a
+withManager opts addr hs = bracket (newManager opts addr hs) closeManager
 
 {-----------------------------------------------------------------------
 --  Logging

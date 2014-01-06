@@ -62,6 +62,8 @@ module Network.KRPC
 
          -- * Manager
        , MonadKRPC (..)
+       , Options (..)
+       , def
        , Manager
        , newManager
        , closeManager
@@ -76,6 +78,7 @@ module Network.KRPC
        , SockAddr (..)
        ) where
 
+import Data.Default.Class
 import Network.KRPC.Message
 import Network.KRPC.Method
 import Network.KRPC.Manager
