@@ -7,12 +7,14 @@
 --
 --   Normally, you don't need to import this module.
 --
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DefaultSignatures   #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE DefaultSignatures      #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE TemplateHaskell        #-}
 module Network.KRPC.Manager
        ( -- * Manager
          MonadKRPC (..)
@@ -35,6 +37,7 @@ import Control.Concurrent.Lifted (fork)
 import Control.Exception hiding (Handler)
 import Control.Exception.Lifted as Lifted (catch)
 import Control.Monad
+import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.BEncode as BE
@@ -43,6 +46,9 @@ import Data.ByteString.Lazy as BL
 import Data.IORef
 import Data.List as L
 import Data.Map as M
+import Data.Monoid
+import Data.Text as T
+import Data.Text.Encoding as T
 import Data.Tuple
 import Network.KRPC.Message
 import Network.KRPC.Method
@@ -76,7 +82,9 @@ data Manager h = Manager
   }
 
 -- | A monad which can perform or handle queries.
-class (MonadBaseControl IO m, MonadIO m) => MonadKRPC h m | m -> h where
+class (MonadBaseControl IO m, MonadLogger m, MonadIO m)
+    => MonadKRPC h m | m -> h where
+
   -- | Ask for manager.
   getManager :: m (Manager h)
 
@@ -89,8 +97,9 @@ class (MonadBaseControl IO m, MonadIO m) => MonadKRPC h m | m -> h where
   default liftHandler :: m a -> m a
   liftHandler = id
 
-instance (MonadBaseControl IO h, MonadIO h)
+instance (MonadBaseControl IO h, MonadLogger h, MonadIO h)
       => MonadKRPC h (ReaderT (Manager h) h) where
+
   liftHandler = lift
 
 sockAddrFamily :: SockAddr -> Family
@@ -178,23 +187,33 @@ queryResponse ares = do
 query :: forall h m a b. (MonadKRPC h m, KRPC a b) => SockAddr -> a -> m b
 query addr params = do
   Manager {..} <- getManager
-  liftIO $ do
-    tid <- genTransactionId transactionCounter
-    let Method name = method :: Method a b
-    let q = KQuery (toBEncode params) name tid
+  tid <- liftIO $ genTransactionId transactionCounter
+  let queryMethod = method :: Method a b
+  let signature = T.pack (show queryMethod)
+               <> " @" <> T.pack (show addr)
+               <> " #" <> T.decodeUtf8 tid
+  $(logDebugS) "query.sending" signature
 
+  mres <- liftIO $ do
     ares <- registerQuery (tid, addr) pendingCalls
+
+    let q = KQuery (toBEncode params) (methodName queryMethod) tid
     sendMessage sock addr q
       `onException` unregisterQuery (tid, addr) pendingCalls
 
-    mres <- timeout (queryTimeout * 10 ^ (6 :: Int)) $ do
+    timeout (queryTimeout * 10 ^ (6 :: Int)) $ do
       queryResponse ares
 
-    case mres of
-      Just res -> return res
-      Nothing -> do
-        _ <- unregisterQuery (tid, addr) pendingCalls
-        throwIO $ timeoutExpired tid
+  case mres of
+    Just res -> do
+      $(logDebugS) "query.responded" $ signature
+      return res
+
+    Nothing -> do
+      _ <- liftIO $ unregisterQuery (tid, addr) pendingCalls
+      $(logWarnS) "query.not_responding" $ signature
+               <> " for " <> T.pack (show queryTimeout) <> " seconds"
+      throw $ timeoutExpired tid
 
 {-----------------------------------------------------------------------
 --  Handlers

@@ -44,13 +44,15 @@ library
                        Network.KRPC.Method
                        Network.KRPC.Manager
   build-depends:       base          == 4.*
-                     , bytestring   >= 0.10
+                     , bytestring    >= 0.10
+                     , text          >= 0.11
                      , lifted-base   >= 0.1.1
                      , transformers  >= 0.2
                      , mtl
                      , monad-control >= 0.3
-                     , bencoding    >= 0.4.3
-                     , network      >= 2.3
+                     , monad-logger  >= 0.3
+                     , bencoding     >= 0.4.3
+                     , network       >= 2.3
                      , containers
   if impl(ghc < 7.6)
     build-depends:     ghc-prim

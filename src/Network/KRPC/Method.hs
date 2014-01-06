@@ -38,7 +38,7 @@ import Network.KRPC.Message
 --
 --     * result: Type of return value of the method.
 --
-newtype Method param result = Method MethodName
+newtype Method param result = Method { methodName :: MethodName }
   deriving (Eq, Ord, IsString, BEncode)
 
 -- | Example:
@@ -74,7 +74,9 @@ showsMethod (Method name) =
 --     method = \"ping\"
 --   @
 --
-class (BEncode req, BEncode resp) => KRPC req resp | req -> resp where
+class (Typeable req, BEncode req, Typeable resp, BEncode resp)
+    => KRPC req resp | req -> resp where
+
   -- | Method name. Default implementation uses lowercased @req@
   -- datatype name.
   --
