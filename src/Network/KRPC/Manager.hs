@@ -67,10 +67,13 @@ import System.Timeout
 -- | RPC manager options.
 data Options = Options
   { -- | Initial 'TransactionId' incremented with each 'query';
-    optSeedTransaction :: Int
+    optSeedTransaction :: {-# UNPACK #-} !Int
 
     -- | Time to wait for response from remote node, in seconds.
-  , optQueryTimeout    :: Int
+  , optQueryTimeout    :: {-# UNPACK #-} !Int
+
+    -- | Maximum number of bytes to receive.
+  , optMaxMsgSize      :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
 
 defaultSeedTransaction :: Int
@@ -79,16 +82,23 @@ defaultSeedTransaction = 0
 defaultQueryTimeout :: Int
 defaultQueryTimeout = 120
 
+defaultMaxMsgSize :: Int
+defaultMaxMsgSize = 64 * 1024
+
 -- | Permissive defaults.
 instance Default Options where
   def = Options
     { optSeedTransaction = defaultSeedTransaction
     , optQueryTimeout    = defaultQueryTimeout
+    , optMaxMsgSize      = defaultMaxMsgSize
     }
 
 validateOptions :: Options -> IO ()
 validateOptions Options {..}
-  | optQueryTimeout < 1 = throwIO (userError "non-positive query timeout")
+  | optQueryTimeout < 1
+  = throwIO (userError "krpc: non-positive query timeout")
+  | optMaxMsgSize   < 1
+  = throwIO (userError "krpc: non-positive buffer size")
   |       otherwise     = return ()
 
 {-----------------------------------------------------------------------
@@ -112,7 +122,7 @@ type Handler     h = (MethodName, HandlerBody h)
 -- made by /remote/ nodes.
 data Manager h = Manager
   { sock               :: !Socket
-  , queryTimeout       :: !Int -- ^ in seconds
+  , options            :: !Options
   , listenerThread     :: !(MVar ThreadId)
   , transactionCounter :: {-# UNPACK #-} !TransactionCounter
   , pendingCalls       :: {-# UNPACK #-} !PendingCalls
@@ -157,7 +167,7 @@ newManager opts @ Options {..} servAddr handlers = do
     tref  <- newEmptyMVar
     tran  <- newIORef optSeedTransaction
     calls <- newIORef M.empty
-    return $ Manager sock optQueryTimeout tref tran calls handlers
+    return $ Manager sock opts tref tran calls handlers
   where
     bindServ = do
       let family = sockAddrFamily servAddr
@@ -245,7 +255,7 @@ query addr params = do
     sendMessage sock addr q
       `onException` unregisterQuery (tid, addr) pendingCalls
 
-    timeout (queryTimeout * 10 ^ (6 :: Int)) $ do
+    timeout (optQueryTimeout options * 10 ^ (6 :: Int)) $ do
       queryResponse ares
 
   case mres of
@@ -255,8 +265,8 @@ query addr params = do
 
     Nothing -> do
       _ <- liftIO $ unregisterQuery (tid, addr) pendingCalls
-      $(logWarnS) "query.not_responding" $ signature
-               <> " for " <> T.pack (show queryTimeout) <> " seconds"
+      $(logWarnS) "query.not_responding" $ signature <> " for " <>
+             T.pack (show (optQueryTimeout options)) <> " seconds"
       throw $ timeoutExpired tid
 
 {-----------------------------------------------------------------------
@@ -332,15 +342,13 @@ handleMessage (Q q) = handleQuery    q
 handleMessage (R r) = handleResponse (Right r)
 handleMessage (E e) = handleResponse (Left  e)
 
--- TODO to options
-maxMsgSize :: Int
-maxMsgSize = 64 * 1024
-
 listener :: MonadKRPC h m => m ()
 listener = do
   Manager {..} <- getManager
   forever $ do
-    (bs, addr) <- liftIO $ handle exceptions $ BS.recvFrom sock maxMsgSize
+    (bs, addr) <- liftIO $ do
+      handle exceptions $ BS.recvFrom sock (optMaxMsgSize options)
+
     case BE.decode bs of
       -- TODO ignore unknown messages at all?
       Left  e -> liftIO $ sendMessage sock addr $ unknownMessage e
