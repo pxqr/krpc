@@ -14,6 +14,7 @@
 {-# LANGUAGE DefaultSignatures      #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE DeriveDataTypeable     #-}
 {-# LANGUAGE TemplateHaskell        #-}
 module Network.KRPC.Manager
        ( -- * Manager
@@ -26,7 +27,10 @@ module Network.KRPC.Manager
        , listen
 
          -- * Queries
+       , QueryFailure (..)
        , query
+
+         -- * Handlers
        , Handler
        , handler
        ) where
@@ -52,6 +56,7 @@ import Data.Monoid
 import Data.Text as T
 import Data.Text.Encoding as T
 import Data.Tuple
+import Data.Typeable
 import Network.KRPC.Message
 import Network.KRPC.Method
 import Network.Socket hiding (listen)
@@ -204,6 +209,15 @@ querySignature name transaction addr = T.concat
 {-----------------------------------------------------------------------
 --  Client
 -----------------------------------------------------------------------}
+-- we don't need to know about TransactionId while performing query,
+-- so we introduce QueryFailure exceptions
+
+data QueryFailure
+  = QueryFailed  ErrorCode Text
+  | TimeoutExpired
+  deriving (Show, Eq, Typeable)
+
+instance Exception QueryFailure
 
 sendMessage :: MonadIO m => BEncode a => Socket -> SockAddr -> a -> m ()
 sendMessage sock addr a = do
@@ -230,15 +244,17 @@ unregisterQuery cid ref = do
 queryResponse :: BEncode a => CallRes -> IO a
 queryResponse ares = do
   res <- readMVar ares
-  KResponse {..} <- either throwIO pure res
-  case fromBEncode respVals of
-    Right r -> pure r
-    Left  e -> throwIO $ decodeError e respId
+  case res of
+    Left  (KError   c m _) -> throwIO $ QueryFailed c (T.decodeUtf8 m)
+    Right (KResponse {..}) ->
+      case fromBEncode respVals of
+        Right r -> pure r
+        Left  e -> throwIO $ QueryFailed ProtocolError (T.pack e)
 
 -- | Enqueue query to the given node.
 --
---  This function will throw exception if quered node respond with
---  @error@ message or timeout expires.
+--  This function should throw 'QueryFailure' exception if quered node
+--  respond with @error@ message or the query timeout expires.
 --
 query :: forall h m a b. (MonadKRPC h m, KRPC a b) => SockAddr -> a -> m b
 query addr params = do
@@ -267,7 +283,7 @@ query addr params = do
       _ <- liftIO $ unregisterQuery (tid, addr) pendingCalls
       $(logWarnS) "query.not_responding" $ signature <> " for " <>
              T.pack (show (optQueryTimeout options)) <> " seconds"
-      throw $ timeoutExpired tid
+      throw $ TimeoutExpired
 
 {-----------------------------------------------------------------------
 --  Handlers

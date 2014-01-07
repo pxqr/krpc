@@ -58,6 +58,9 @@ module Network.KRPC
          -- * RPC
        , Handler
        , handler
+
+         -- ** Query
+       , QueryFailure (..)
        , query
 
          -- * Manager
