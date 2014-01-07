@@ -35,7 +35,7 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.Lifted (fork)
 import Control.Exception hiding (Handler)
-import Control.Exception.Lifted as Lifted (catch)
+import Control.Exception.Lifted as Lifted (catch, finally)
 import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.Reader
@@ -332,6 +332,7 @@ handleMessage (Q q) = handleQuery    q
 handleMessage (R r) = handleResponse (Right r)
 handleMessage (E e) = handleResponse (Left  e)
 
+-- TODO to options
 maxMsgSize :: Int
 maxMsgSize = 64 * 1024
 
@@ -356,5 +357,7 @@ listener = do
 listen :: MonadKRPC h m => m ()
 listen = do
   Manager {..} <- getManager
-  tid <- fork $ listener
+  tid <- fork $ do
+    listener `Lifted.finally`
+      liftIO (takeMVar listenerThread)
   liftIO $ putMVar listenerThread tid
