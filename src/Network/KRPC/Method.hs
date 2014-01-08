@@ -1,5 +1,5 @@
 -- |
---   Copyright   :  (c) Sam Truzjan 2013
+--   Copyright   :  (c) Sam Truzjan 2013, 2014
 --   License     :  BSD3
 --   Maintainer  :  pxqr.sta@gmail.com
 --   Stability   :  experimental

@@ -1,3 +1,14 @@
+2014-01-08  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	0.6.0.0: Logging + exceptions.
+
+	API changes:
+
+	* MonadLogger is superclass of MonadKRPC;
+	* KError hidden from Network.KRPC;
+	* HandlerFailure added;
+	* QueryFailure and getQueryCount added.
+
 2013-12-25  Sam Truzjan  <pxqr.sta@gmail.com>
 
 	0.5.0.0: Major API changes.
