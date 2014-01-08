@@ -76,7 +76,7 @@ module Network.KRPC
        , withManager
        , listen
 
-         -- * Re-expor
+         -- * Re-exports
        , ErrorCode (..)
        , SockAddr (..)
        ) where
