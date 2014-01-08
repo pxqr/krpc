@@ -37,4 +37,4 @@ spec = do
       (withManager opts servAddr handlers $ runReaderT $ do
          query servAddr (Echo (0xabcd :: Int))
        )
-        `shouldThrow` (== KError GenericError "timeout expired" "0")
+        `shouldThrow` (== TimeoutExpired)

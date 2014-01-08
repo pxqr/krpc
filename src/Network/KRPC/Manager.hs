@@ -31,6 +31,7 @@ module Network.KRPC.Manager
        , query
 
          -- * Handlers
+       , HandlerFailure (..)
        , Handler
        , handler
        ) where
@@ -39,7 +40,8 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.Lifted (fork)
 import Control.Exception hiding (Handler)
-import Control.Exception.Lifted as Lifted (catch, finally)
+import qualified Control.Exception.Lifted as E (Handler (..))
+import Control.Exception.Lifted as Lifted (catches, finally)
 import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.Reader
@@ -288,9 +290,38 @@ query addr params = do
 {-----------------------------------------------------------------------
 --  Handlers
 -----------------------------------------------------------------------}
+-- we already throw:
+--
+--   * ErrorCode(MethodUnknown) in the 'dispatchHandler';
+--
+--   * ErrorCode(ServerError) in the 'runHandler'; (those can be
+--   async exception too)
+--
+--   * ErrorCode(GenericError) on
+
+-- | Used to signal protocol errors.
+data HandlerFailure
+  = BadAddress            -- ^ for e.g.: node calls herself;
+  | InvalidParameter Text -- ^ for e.g.: bad session token.
+    deriving (Show, Eq, Typeable)
+
+instance Exception HandlerFailure
+
+prettyHF :: HandlerFailure -> BS.ByteString
+prettyHF  BadAddress               = T.encodeUtf8 "bad address"
+prettyHF (InvalidParameter reason) = T.encodeUtf8 $
+  "invalid parameter: " <> reason
+
+prettyQF :: QueryFailure -> BS.ByteString
+prettyQF e = T.encodeUtf8 $ "handler fail while performing query: "
+  <> T.pack (show e)
 
 -- | Make handler from handler function. Any thrown exception will be
 -- supressed and send over the wire back to the querying node.
+--
+--   If the handler make some 'query' normally it /should/ handle
+--   corresponding 'QueryFailure's.
+--
 handler :: forall h a b. (KRPC a b, Monad h)
         => (SockAddr -> a -> h b) -> Handler h
 handler body = (name, wrapper)
@@ -305,7 +336,7 @@ handler body = (name, wrapper)
 
 runHandler :: MonadKRPC h m
            => HandlerBody h -> SockAddr -> KQuery -> m KResult
-runHandler h addr KQuery {..} = wrapper `Lifted.catch` failback
+runHandler h addr KQuery {..} = Lifted.catches wrapper failbacks
   where
     signature = querySignature queryMethod queryId addr
 
@@ -315,22 +346,33 @@ runHandler h addr KQuery {..} = wrapper `Lifted.catch` failback
 
       case result of
         Left msg -> do
-          $(logDebugS) "handler.failed" $ signature <> " !" <> T.pack msg
-          return $ Left  $ decodeError msg queryId
+          $(logDebugS) "handler.bad_query" $ signature <> " !" <> T.pack msg
+          return $ Left $ KError ProtocolError (BC.pack msg) queryId
 
         Right a -> do
           $(logDebugS) "handler.success" signature
-          return $ Right $ a `KResponse`   queryId
+          return $ Right $ KResponse a queryId
 
-    failback e = do
-      $(logDebugS) "handler.errored" signature
-      return $ Left $ serverError e queryId
+    failbacks =
+      [ E.Handler $ \ (e :: HandlerFailure) -> do
+          $(logDebugS) "handler.failed" signature
+          return $ Left $ KError ProtocolError (prettyHF e) queryId
+
+        -- may happen if handler makes query and fail
+      , E.Handler $ \ (e :: QueryFailure) -> do
+          return $ Left $ KError ServerError (prettyQF e) queryId
+
+        -- since handler thread exit after sendMessage we can safely
+        -- suppress async exception here
+      , E.Handler $ \ (e :: SomeException) -> do
+          return $ Left $ KError GenericError (BC.pack (show e)) queryId
+      ]
 
 dispatchHandler :: MonadKRPC h m => KQuery -> SockAddr -> m KResult
 dispatchHandler q @ KQuery {..} addr = do
   Manager {..} <- getManager
   case L.lookup queryMethod handlers of
-    Nothing -> return $ Left $ unknownMethod queryMethod queryId
+    Nothing -> return $ Left $ KError MethodUnknown queryMethod queryId
     Just h  -> runHandler h addr q
 
 {-----------------------------------------------------------------------

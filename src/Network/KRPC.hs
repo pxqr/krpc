@@ -56,12 +56,14 @@ module Network.KRPC
        , KRPC (..)
 
          -- * RPC
-       , Handler
-       , handler
-
          -- ** Query
        , QueryFailure (..)
        , query
+
+         -- ** Handler
+       , HandlerFailure (..)
+       , Handler
+       , handler
 
          -- * Manager
        , MonadKRPC (..)
@@ -73,11 +75,8 @@ module Network.KRPC
        , withManager
        , listen
 
-         -- * Exceptions
-       , KError (..)
+         -- * Re-expor
        , ErrorCode (..)
-
-         -- * Re-export
        , SockAddr (..)
        ) where
 

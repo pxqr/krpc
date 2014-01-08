@@ -26,11 +26,8 @@ module Network.KRPC.Message
          -- * Error
        , ErrorCode (..)
        , KError(..)
-       , serverError
        , decodeError
-       , unknownMethod
        , unknownMessage
-       , timeoutExpired
 
          -- * Query
        , KQuery(..)
@@ -143,28 +140,14 @@ instance BEncode KError where
 
 instance Exception KError
 
--- | Happen when some query handler fail.
-serverError :: SomeException -> TransactionId -> KError
-serverError e = KError ServerError (BC.pack (show e))
-
 -- | Received 'queryArgs' or 'respVals' can not be decoded.
 decodeError :: String -> TransactionId -> KError
 decodeError msg = KError ProtocolError (BC.pack msg)
-
--- | If /remote/ node send query /this/ node doesn't know about then
--- this error message should be sent in response.
-unknownMethod :: MethodName -> TransactionId -> KError
-unknownMethod = KError MethodUnknown
 
 -- | A remote node has send some 'KMessage' this node is unable to
 -- decode.
 unknownMessage :: String -> KError
 unknownMessage msg = KError ProtocolError (BC.pack msg) unknownTransaction
-
--- | A /remote/ node is not responding to the /our/ request the for
--- specified period of time.
-timeoutExpired :: TransactionId -> KError
-timeoutExpired = KError GenericError "timeout expired"
 
 {-----------------------------------------------------------------------
 -- Query messages
