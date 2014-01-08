@@ -214,9 +214,11 @@ querySignature name transaction addr = T.concat
 -- we don't need to know about TransactionId while performing query,
 -- so we introduce QueryFailure exceptions
 
+-- | Used to signal 'query' errors.
 data QueryFailure
-  = QueryFailed  ErrorCode Text
-  | TimeoutExpired
+  = SendFailed                  -- ^ unable to send query;
+  | QueryFailed  ErrorCode Text -- ^ remote node return error;
+  | TimeoutExpired              -- ^ remote node not responding.
   deriving (Show, Eq, Typeable)
 
 instance Exception QueryFailure
@@ -253,6 +255,13 @@ queryResponse ares = do
         Right r -> pure r
         Left  e -> throwIO $ QueryFailed ProtocolError (T.pack e)
 
+-- (sendmsg EINVAL)
+sendQuery :: BEncode a => Socket -> SockAddr -> a -> IO ()
+sendQuery sock addr q = handle sockError $ sendMessage sock addr q
+  where
+    sockError :: IOError -> IO ()
+    sockError _ = throwIO SendFailed
+
 -- | Enqueue query to the given node.
 --
 --  This function should throw 'QueryFailure' exception if quered node
@@ -270,7 +279,7 @@ query addr params = do
     ares <- registerQuery (tid, addr) pendingCalls
 
     let q = KQuery (toBEncode params) (methodName queryMethod) tid
-    sendMessage sock addr q
+    sendQuery sock addr q
       `onException` unregisterQuery (tid, addr) pendingCalls
 
     timeout (optQueryTimeout options * 10 ^ (6 :: Int)) $ do
