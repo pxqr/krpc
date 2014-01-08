@@ -202,6 +202,7 @@ withManager opts addr hs = bracket (newManager opts addr hs) closeManager
 --  Logging
 -----------------------------------------------------------------------}
 
+-- TODO prettify log messages
 querySignature :: MethodName -> TransactionId -> SockAddr -> Text
 querySignature name transaction addr = T.concat
   [  "&", T.decodeUtf8 name
@@ -311,10 +312,12 @@ query addr params = do
 --
 --   * ErrorCode(MethodUnknown) in the 'dispatchHandler';
 --
---   * ErrorCode(ServerError) in the 'runHandler'; (those can be
+--   * ErrorCode(ServerError) in the 'runHandler';
+--
+--   * ErrorCode(GenericError) in the 'runHandler' (those can be
 --   async exception too)
 --
---   * ErrorCode(GenericError) on
+--  so HandlerFailure should cover *only* 'ProtocolError's.
 
 -- | Used to signal protocol errors.
 data HandlerFailure
@@ -396,6 +399,13 @@ dispatchHandler q @ KQuery {..} addr = do
 --  Listener
 -----------------------------------------------------------------------}
 
+-- TODO bound amount of parallel handler *threads*:
+--
+-- peer A flooding with find_node
+-- peer B trying to ping peer C
+-- peer B fork too many threads
+-- ... space leak
+--
 handleQuery :: MonadKRPC h m => KQuery -> SockAddr -> m ()
 handleQuery q addr = void $ fork $ do
   Manager {..} <- getManager
