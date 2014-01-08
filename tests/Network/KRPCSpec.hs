@@ -33,6 +33,15 @@ spec = do
          query servAddr (Echo int))
        `shouldReturn` Echo int
 
+    it "count transactions properly" $ do
+      (withManager opts servAddr handlers $ runReaderT $ do
+         listen
+         _ <- query servAddr (Echo (0xabcd :: Int))
+         _ <- query servAddr (Echo (0xabcd :: Int))
+         getQueryCount
+       )
+        `shouldReturn` 2
+
     it "throw timeout exception" $ do
       (withManager opts servAddr handlers $ runReaderT $ do
          query servAddr (Echo (0xabcd :: Int))

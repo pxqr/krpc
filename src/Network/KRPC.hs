@@ -59,6 +59,7 @@ module Network.KRPC
          -- ** Query
        , QueryFailure (..)
        , query
+       , getQueryCount
 
          -- ** Handler
        , HandlerFailure (..)

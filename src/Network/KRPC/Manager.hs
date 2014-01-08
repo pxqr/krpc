@@ -29,6 +29,7 @@ module Network.KRPC.Manager
          -- * Queries
        , QueryFailure (..)
        , query
+       , getQueryCount
 
          -- * Handlers
        , HandlerFailure (..)
@@ -231,6 +232,13 @@ genTransactionId :: TransactionCounter -> IO TransactionId
 genTransactionId ref = do
   cur <- atomicModifyIORef' ref $ \ cur -> (succ cur, cur)
   return $ BC.pack (show cur)
+
+-- | How many times 'query' call have been performed.
+getQueryCount :: MonadKRPC h m => m Int
+getQueryCount = do
+  Manager {..} <- getManager
+  curTrans <- liftIO $ readIORef transactionCounter
+  return $ curTrans - optSeedTransaction options
 
 registerQuery :: CallId -> PendingCalls -> IO CallRes
 registerQuery cid ref = do
