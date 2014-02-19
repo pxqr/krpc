@@ -1,3 +1,13 @@
+2014-02-19  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	0.6.0.0
+
+	API changes:
+
+	* Added isActive: this predicate can be used to implement
+	MonadActive instance and useful for resource
+	initialization/finalization sanity check.
+
 2014-01-08  Sam Truzjan  <pxqr.sta@gmail.com>
 
 	0.6.0.0: Logging + exceptions.
