@@ -25,6 +25,13 @@ opts = def { optQueryTimeout = 1 }
 
 spec :: Spec
 spec = do
+  describe "manager" $ do
+    it "is active until closeManager called" $ do
+      m <- newManager opts servAddr []
+      isActive m `shouldReturn` True
+      closeManager m
+      isActive m `shouldReturn` False
+
   describe "query" $ do
     it "run handlers" $ do
       let int = 0xabcd :: Int
