@@ -74,6 +74,7 @@ module Network.KRPC
        , newManager
        , closeManager
        , withManager
+       , isActive
        , listen
 
          -- * Re-exports

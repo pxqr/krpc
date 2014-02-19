@@ -24,6 +24,7 @@ module Network.KRPC.Manager
        , newManager
        , closeManager
        , withManager
+       , isActive
        , listen
 
          -- * Queries
@@ -191,6 +192,12 @@ closeManager Manager {..} = do
   maybe (return ()) killThread =<< tryTakeMVar listenerThread
   -- TODO unblock calls
   close sock
+
+-- | Check if the manager is still active. Manager becomes active
+-- until 'closeManager' called.
+isActive :: Manager m -> IO Bool
+isActive Manager {..} = liftIO $ isBound sock
+{-# INLINE isActive #-}
 
 -- | Normally you should use Control.Monad.Trans.Resource.allocate
 -- function.
