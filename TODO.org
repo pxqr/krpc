@@ -1,17 +1,17 @@
-* DONE document protocol
-* DONE Ascending everywhere
-* DONE document KRPC module
-* DONE move exsamples to tests
-* DONE make HUnit tests
-* DONE run server in test automatically
-* DONE use one socket everywhere
-* DONE fix performance issues
-* DONE add readme
-* DONE return scheme back
-* DONE add Show instance for Method
-* DONE add BEncodable instance for Method
-* DONE remove async api
-* DONE expose client addr in server-side handlers
-* DONE major version bump to 0.2.0.0 (reason: async API removed)
-* DONE Remote.* -> Network.*
-* DONE ipv6 support
+* configure travis
+* liftKRPC ::
+* add withRetries
+* bump version to 0.7.0.0
+
+* add issue: getQueryCount --> getRpcStats
+data Stats = Stats
+  { queryFailed    :: {-# UNPACK #-} !Int
+  , querySucceed   :: {-# UNPACK #-} !Int
+  , handlerFailed  :: {-# UNPACK #-} !Int
+  , handlerSucceed :: {-# UNPACK #-} !Int
+  , sentBytes      :: {-# UNPACK #-} !Int
+  , receivedBytes  :: {-# UNPACK #-} !Int
+  }
+
+* add asyncQuery :: SockAddr -> a -> m (Async a)
+* add queries :: [(SockAddr, a)] -> m [Either  a]
