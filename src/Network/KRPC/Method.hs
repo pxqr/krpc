@@ -9,7 +9,6 @@
 --
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE DefaultSignatures          #-}
@@ -75,7 +74,7 @@ showsMethod (Method name) =
 --   @
 --
 class (Typeable req, BEncode req, Typeable resp, BEncode resp)
-    => KRPC req resp | req -> resp where
+    => KRPC req resp where
 
   -- | Method name. Default implementation uses lowercased @req@
   -- datatype name.
