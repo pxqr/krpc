@@ -40,7 +40,7 @@ library
                      , RecordWildCards
   hs-source-dirs:      src
   exposed-modules:     Network.KRPC
-  other-modules:       Network.KRPC.Message
+                       Network.KRPC.Message
                        Network.KRPC.Method
                        Network.KRPC.Manager
   build-depends:       base          == 4.*
