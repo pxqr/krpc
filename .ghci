@@ -1,3 +1,4 @@
+:set -isrc -itests -XRecordWildCards
 import Control.Concurrent
 import Data.BEncode
 import Network
