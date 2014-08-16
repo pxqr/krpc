@@ -25,6 +25,9 @@ opts = def { optQueryTimeout = 1 }
 
 spec :: Spec
 spec = do
+  let qr :: MonadKRPC h m => SockAddr -> Echo Int -> m (Echo Int)
+      qr = query
+
   describe "manager" $ do
     it "is active until closeManager called" $ do
       m <- newManager opts servAddr []
@@ -43,14 +46,14 @@ spec = do
     it "count transactions properly" $ do
       (withManager opts servAddr handlers $ runReaderT $ do
          listen
-         _ <- query servAddr (Echo (0xabcd :: Int))
-         _ <- query servAddr (Echo (0xabcd :: Int))
+         _ <- qr servAddr (Echo 0xabcd)
+         _ <- qr servAddr (Echo 0xabcd)
          getQueryCount
        )
         `shouldReturn` 2
 
     it "throw timeout exception" $ do
       (withManager opts servAddr handlers $ runReaderT $ do
-         query servAddr (Echo (0xabcd :: Int))
+         qr servAddr (Echo 0xabcd)
        )
         `shouldThrow` (== TimeoutExpired)
